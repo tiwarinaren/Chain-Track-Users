@@ -165,6 +165,9 @@
             <div id="loading-indicator" class="mt-4 text-center text-indigo-500 dark:text-indigo-400 hidden">
                 <i class="fas fa-spinner fa-spin mr-2"></i> Connecting...
             </div>
+            <div class="mt-6 text-center text-xs text-gray-500 dark:text-gray-400">
+                Developed with ❤️ by <a href="mailto:tiwarinaren@gmail.com" class="underline hover:text-indigo-600 dark:hover:text-indigo-400">Naren Tiwari</a>
+            </div>
         </div>
     </div>
 
@@ -448,6 +451,9 @@
                 <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Share this code with your partner to join the pair.</p>
             </section>
                 </section>
+            </div>
+            <div class="mt-6 text-center text-xs text-gray-500 dark:text-gray-400">
+                Developed with ❤️ by <a href="mailto:tiwarinaren@gmail.com" class="underline hover:text-indigo-600 dark:hover:text-indigo-400">Naren Tiwari</a>
             </div>
         </aside>
 
@@ -1182,10 +1188,6 @@
             const noHabitsMsg = getEl('no-habits-message'); const noFilteredMsg = getEl('no-filtered-habits-message');
             if (!container || !noHabitsMsg || !noFilteredMsg) {
                 console.error("renderHabits: Core elements not found!"); return;
-            }
-            container.innerHTML = '';
-            clearPendingUndo(); // Clear any pending undo state visually
-
             }
             container.innerHTML = '';
             clearPendingUndo(); // Clear any pending undo state visually
