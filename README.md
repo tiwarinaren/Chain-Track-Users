@@ -4,13 +4,11 @@ A simple, shareable habit tracker focused on building streaks ('chains') for two
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**[Link to Live Demo](YOUR_DEMO_URL_HERE)** *(Replace with your actual demo URL if deployed)*
+**[Link to Live Demo](COMING SOON)** 
 
 ## Screenshots
 
-*(Consider adding screenshots here to showcase the application's UI. Good examples include: Login Screen, User Habit View (with chains), Comparison Dashboard, Settings Panel)*
-
-![Screenshot Placeholder 1](IMAGE_URL_1_HERE)
+![Screenshot Placeholder 1](IMAGE_URL_1_HER)
 ![Screenshot Placeholder 2](IMAGE_URL_2_HERE)
 ![Screenshot Placeholder 3](IMAGE_URL_3_HERE)
 
