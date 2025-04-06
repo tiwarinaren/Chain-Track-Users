@@ -1,0 +1,2116 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChainTrack - Habit Tracker</title>
+
+    <!-- ## PWA & Mobile Behavior ## -->
+    <meta name="mobile-web-app-capable" content="yes"> <!-- Important for Android legacy "Add to Home screen" -->
+    <meta name="apple-mobile-web-app-capable" content="yes"> <!-- !! Key for iOS standalone !! -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ChainTrack"> <!-- Title shown during A2HS on iOS -->
+    <meta name="theme-color" content="#4f46e5"> <!-- Hint for browser UI theming -->
+    <meta name="description" content="Build habits, forge your future.">
+    <link rel="manifest" href="manifest.json">
+
+    <!-- ## Icons ## -->
+    <!-- iOS Home Screen Icon (Use PNG - Crucial for standalone icon) -->
+    <link rel="apple-touch-icon" href="apple-touch-icon.png"> <!-- Point to your 180x180 or 192x192 PNG -->
+
+    <!-- Standard Favicons (Browser Tabs, Bookmarks, etc.) -->
+    <!-- <link rel="icon" href="favicon.ico" sizes="any"> -->
+    <!-- <link rel="icon" href="icon.svg" type="image/svg+xml"> -->
+    <!-- You can add specific PNG sizes here too if needed for older browsers -->
+    <!-- <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png"> -->
+    <!-- <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png"> -->
+
+
+    <!-- Libraries -->
+    <script src="https://cdn.tailwindcss.com/3.3.3"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+
+    <!-- Load Firebase Config BEFORE the main script -->
+    <!-- IMPORTANT: Make sure firebase-config.js exists and contains your actual keys -->
+    <script src="firebase-config.js"></script>
+
+    <style>
+        /* Base Styles & Animations */
+        :root {
+            --color-indigo-500: #6366f1; /* Define CSS variables for dynamic colors */
+            --color-green-500: #22c55e;
+            --color-blue-500: #3b82f6;
+            --color-pink-500: #ec4899;
+            --color-purple-500: #a855f7;
+            --color-yellow-500: #eab308;
+            --color-teal-500: #14b8a6;
+            --color-red-500: #ef4444;
+            --color-orange-500: #f97316;
+            --color-gray-600: #4b5563; /* Ensure gray is defined if used as fallback */
+        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        .fade-in { animation: fadeIn 0.5s ease-in forwards; }
+        .slide-up { animation: slideUp 0.4s ease-out forwards; }
+        .streak-fire { animation: pulse 1.5s infinite ease-in-out; }
+
+        /* Card Styling */
+        .habit-card { transition: transform 0.2s ease-out, box-shadow 0.2s ease-out; }
+        .habit-card:hover { transform: translateY(-3px); box-shadow: 0 6px 12px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+        .dark .habit-card:hover { box-shadow: 0 6px 12px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3); }
+        .habit-icon { width: 16px; height: 16px; margin-right: 8px; }
+        .category-tag { font-size: 0.65rem; padding: 1px 6px; border-radius: 99px; line-height: 1; text-transform: uppercase; font-weight: 600; }
+
+        /* Dark Mode */
+        .dark .dark\:bg-gray-950 { background-color: #0c1118; }
+        .dark .dark\:bg-gray-900 { background-color: #161b22; }
+        .dark .dark\:bg-gray-800 { background-color: #1f2937; }
+        .dark .dark\:text-gray-100 { color: #e6edf3; }
+        .dark .dark\:text-gray-300 { color: #bdc6cf; }
+        .dark .dark\:border-gray-700 { border-color: #30363d; }
+        .dark input:not([type="file"]), .dark select, .dark textarea {
+            background-color: #0d1117 !important;
+            border-color: #30363d !important;
+            color: #e6edf3 !important;
+            border-radius: 6px;
+        }
+        .dark input::placeholder, .dark textarea::placeholder { color: #768390; }
+        .dark input:focus, .dark select:focus, .dark textarea:focus { border-color: #58a6ff; box-shadow: 0 0 0 2px rgba(56, 139, 253, 0.3); outline: none; }
+
+        /* Settings & Modals */
+        .settings-panel { transition: transform 0.3s ease-out; transform: translateX(100%); }
+        .settings-panel.open { transform: translateX(0); }
+        .modal-overlay { background-color: rgba(10, 10, 20, 0.7); transition: opacity 0.3s ease; backdrop-filter: blur(2px); }
+        .modal-content { transition: transform 0.3s ease, opacity 0.3s ease; transform: scale(0.95); opacity: 0; }
+        .modal-overlay:not(.hidden) .modal-content { transform: scale(1); opacity: 1; }
+
+        /* User Avatar */
+        .user-avatar { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 3px solid #fff; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); }
+        .dark .user-avatar { border-color: #30363d; }
+
+        /* Chain Links */
+        .chain-link { transition: background-color 0.2s ease, transform 0.1s ease; }
+        #edit-chain-container button:hover { transform: scale(1.1); }
+
+        /* Toggle Switch */
+        #dark-mode-toggle { transition: background-color 0.2s ease; }
+        #dark-mode-toggle span:last-child { transition: transform 0.2s ease; }
+
+        /* Undo Button */
+        .undo-button { transition: all 0.3s ease; }
+        .undo-button.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
+
+        /* Notifications */
+        #notification-area div {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+        #notification-area div.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+         /* Chart Canvas */
+         #streakComparisonChart { display: block; box-sizing: border-box; height: 300px; width: 100%; }
+    </style>
+</head>
+<body class="min-h-full bg-gray-100 dark:bg-gray-950 text-gray-900 dark:text-gray-100 transition-colors duration-300 font-sans">
+    <!-- Login Screen -->
+    <div id="login-screen" role="dialog" aria-modal="true" aria-labelledby="login-title" class="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-700 dark:from-gray-900 dark:to-black z-50 transition-opacity duration-500">
+        <div class="bg-white dark:bg-gray-900 p-8 rounded-xl shadow-2xl max-w-md w-full mx-4 transform transition-all duration-500 scale-95" id="login-container">
+            <div class="text-center mb-8">
+                <div class="flex justify-center items-center mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-16 h-16 text-indigo-600 dark:text-indigo-400">
+                        <path d="M0 0h24v24H0z" fill="none"/>
+                        <path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/>
+                    </svg>
+                </div>
+                <h1 id="login-title" class="text-3xl font-bold text-indigo-600 dark:text-indigo-400 mb-2">ChainTrack</h1>
+                <p class="text-gray-600 dark:text-gray-400">Build habits, forge your future.</p>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label for="email-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+                    <input type="email" id="email-input" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white" placeholder="you@example.com">
+                </div>
+                <div>
+                    <label for="password-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
+                    <input type="password" id="password-input" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white" placeholder="Your password">
+                </div>
+                <button id="email-login-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white py-2.5 px-4 rounded-lg transition duration-300 transform hover:scale-105 text-lg font-semibold flex items-center justify-center space-x-2">
+                    <i class="fas fa-sign-in-alt"></i>
+                    <span>Sign In</span>
+                </button>
+                <button id="email-signup-btn" class="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 px-4 rounded-lg transition duration-300 transform hover:scale-105 text-lg font-semibold flex items-center justify-center space-x-2">
+                    <i class="fas fa-user-plus"></i>
+                    <span>Sign Up</span>
+                </button>
+                <button id="google-login-btn" class="w-full bg-red-500 hover:bg-red-600 text-white py-2.5 px-4 rounded-lg transition duration-300 transform hover:scale-105 text-lg font-semibold flex items-center justify-center space-x-2">
+                    <i class="fab fa-google"></i>
+                    <span>Sign in with Google</span>
+                </button>
+            </div>
+            <div id="auth-error" class="mt-4 text-red-500 dark:text-red-400 text-center hidden text-sm"></div>
+            <div id="loading-indicator" class="mt-4 text-center text-indigo-500 dark:text-indigo-400 hidden">
+                <i class="fas fa-spinner fa-spin mr-2"></i> Connecting...
+            </div>
+        </div>
+    </div>
+
+    <!-- Pairing Screen -->
+    <div id="pairing-screen" role="dialog" aria-modal="true" class="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-700 dark:from-gray-900 dark:to-black z-50 hidden">
+        <div class="bg-white dark:bg-gray-900 p-8 rounded-xl shadow-2xl max-w-md w-full mx-4">
+            <h2 class="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mb-4 text-center">Pair Setup</h2>
+            <div class="space-y-4">
+                <button id="create-pair-btn" class="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg font-semibold">Create New Pair</button>
+                <div class="text-center text-gray-500 dark:text-gray-400">OR</div>
+                <input id="join-code-input" type="text" placeholder="Enter Invite Code" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white text-center uppercase tracking-widest">
+                <button id="join-pair-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-semibold">Join Pair</button>
+                <div id="pair-error" class="text-red-500 dark:text-red-400 text-center hidden text-sm"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div id="app-container" role="main" class="hidden min-h-screen relative flex flex-col">
+        <!-- Header -->
+        <header class="bg-white dark:bg-gray-900 shadow-sm sticky top-0 z-30">
+            <div class="container mx-auto px-4 py-3">
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center space-x-2">
+                         <!-- Using SVG for header icon for sharpness -->
+                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 text-indigo-600 dark:text-indigo-400">
+                           <path d="M0 0h24v24H0z" fill="none"/>
+                           <path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/>
+                         </svg>
+                        <h1 class="text-xl font-bold text-gray-800 dark:text-gray-100">ChainTrack</h1>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                         <span id="sync-status" class="text-xs text-gray-400 mr-2 hidden" title="Sync Status">
+                             <i class="fas fa-sync"></i> <span id="sync-status-text">Syncing...</span>
+                         </span>
+                        <button id="settings-btn" class="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition" title="Settings">
+                            <i class="fas fa-cog text-lg"></i>
+                        </button>
+                        <button id="theme-toggle" class="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition" title="Toggle Theme">
+                            <i class="fas fa-moon text-lg text-gray-600 dark:text-yellow-300 hidden dark:inline-block"></i>
+                            <i class="fas fa-sun text-lg text-gray-600 dark:text-gray-100 inline-block dark:hidden"></i>
+                        </button>
+                        <button id="logout-btn" class="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition" title="Logout">
+                            <i class="fas fa-sign-out-alt text-lg"></i>
+                        </button>
+                    </div>
+                </div>
+                 <!-- Motivational Quote -->
+                 <div id="quote-container" class="text-center text-xs italic text-gray-500 dark:text-gray-500 pt-2 mt-2 border-t border-gray-200 dark:border-gray-700">
+                    <p id="quote-text"></p>
+                    <p id="quote-author" class="font-semibold"></p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="flex-grow container mx-auto px-4 py-6">
+            <!-- View Selection & Container -->
+            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-md p-4 md:p-6 mb-6">
+                 <!-- Top Navigation -->
+                 <div class="flex flex-wrap justify-center md:justify-start items-center gap-2 mb-6 border-b border-gray-200 dark:border-gray-700 pb-4">
+                     <button id="user1-btn" class="px-3 py-1.5 text-sm font-medium rounded-lg transition flex items-center space-x-2">
+                         <img id="btn-user1-avatar" class="w-5 h-5 rounded-full object-cover inline-block" src="" alt="U1">
+                         <span id="btn-user1-name">User 1</span>
+                     </button>
+                     <button id="user2-btn" class="px-3 py-1.5 text-sm font-medium rounded-lg transition flex items-center space-x-2">
+                         <img id="btn-user2-avatar" class="w-5 h-5 rounded-full object-cover inline-block" src="" alt="U2">
+                         <span id="btn-user2-name">User 2</span>
+                     </button>
+                     <button id="compare-btn" class="px-3 py-1.5 text-sm font-medium rounded-lg transition flex items-center space-x-2">
+                         <i class="fas fa-chart-bar w-4 text-center"></i>
+                         <span>Compare</span>
+                     </button>
+                 </div>
+
+                <!-- View Container -->
+                 <div id="view-container">
+                    <!-- Dashboard View -->
+                    <div id="dashboard-view" class="hidden">
+                    
+                    <!-- Analytics View -->
+                    <div id="analytics-view" class="hidden mt-6">
+                        <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-100 mb-4 text-center">Habit Analytics</h3>
+                        <div class="flex flex-wrap justify-center gap-3 mb-4">
+                            <button id="analytics-week-btn" class="px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-sm">This Week</button>
+                            <button id="analytics-month-btn" class="px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg text-sm">This Month</button>
+                            <button id="export-csv-btn" class="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm">Export CSV</button>
+                            <button id="export-json-btn" class="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm">Export JSON</button>
+                        </div>
+                        <div class="bg-white dark:bg-gray-900 rounded-xl shadow-md p-4 border border-gray-200 dark:border-gray-700">
+                            <canvas id="analyticsChart" height="300"></canvas>
+                        </div>
+                    </div>
+                        <h3 class="text-xl font-semibold text-gray-700 dark:text-gray-100 mb-6 text-center">Comparison Dashboard</h3>
+<div class="mb-6">
+    <h4 class="text-lg font-semibold text-gray-700 dark:text-gray-100 mb-4 text-center">Leaderboard</h4>
+    <ul id="leaderboard-list" class="space-y-2 text-center">
+        <!-- Leaderboard entries populated by JS -->
+    </ul>
+</div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                            <!-- User 1 Stats Card -->
+                            <div class="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                                <div class="flex items-center space-x-3 mb-4">
+                                    <img id="dashboard-user1-avatar" class="user-avatar w-10 h-10" src="" alt="U1">
+                                    <h4 id="dashboard-user1-name" class="font-semibold text-lg text-indigo-700 dark:text-indigo-400">User 1 Stats</h4>
+                                </div>
+                                <div id="user1-stats" class="space-y-1.5 text-sm"></div>
+                            </div>
+                            <!-- User 2 Stats Card -->
+                            <div class="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                                <div class="flex items-center space-x-3 mb-4">
+                                    <img id="dashboard-user2-avatar" class="user-avatar w-10 h-10" src="" alt="U2">
+                                    <h4 id="dashboard-user2-name" class="font-semibold text-lg text-green-700 dark:text-green-400">User 2 Stats</h4>
+                                </div>
+                                <div id="user2-stats" class="space-y-1.5 text-sm"></div>
+                            </div>
+                        </div>
+                        <!-- Comparison Chart -->
+                        <div>
+                            <h4 class="text-lg font-semibold text-gray-700 dark:text-gray-100 mb-4 text-center">Current Streak Comparison</h4>
+                            <div class="flex justify-center mb-4">
+                                <button id="share-progress-btn" class="px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm">Share Progress</button>
+                            </div>
+                            <div id="comparison-chart-container" class="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 min-h-[320px]">
+                                 <canvas id="streakComparisonChart"></canvas>
+                                 <p id="no-comparison-data" class="text-center text-gray-500 dark:text-gray-400 hidden pt-16">No shared habits with current streaks > 0 to compare.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- User Habit View -->
+                    <div id="user-view" class="hidden">
+                        <!-- User Info Header -->
+                        <div class="flex flex-col sm:flex-row items-center justify-between mb-6 gap-4">
+                            <div class="flex items-center space-x-3">
+                                <img id="current-user-avatar" class="user-avatar" src="" alt="Current User">
+                                <div>
+                                    <h3 id="current-user" class="text-xl font-semibold text-indigo-700 dark:text-indigo-400"></h3>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">Overall Best Streak:
+                                        <span id="current-streak" class="font-bold text-sm flex items-center text-gray-700 dark:text-gray-200">
+                                            <span id="streak-days">0</span> days
+                                            <i id="streak-icon" class="fas fa-star text-yellow-400 ml-1 text-xs hidden"></i>
+                                        </span>
+                                    </p>
+                                </div>
+                            </div>
+                            <button id="add-habit-btn" class="w-full sm:w-auto px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition flex items-center justify-center space-x-1.5 text-sm font-medium shadow hover:shadow-md">
+                                <i class="fas fa-plus"></i>
+                                <span>Add Habit</span>
+                            </button>
+                        </div>
+
+                        <!-- Add Habit Form (Inline) -->
+                        <div id="add-habit-form" class="hidden mb-6 bg-indigo-50 dark:bg-gray-800 p-4 rounded-lg shadow-inner border border-indigo-100 dark:border-gray-700">
+                            <h4 class="text-md font-semibold mb-3 text-indigo-800 dark:text-indigo-300">Add New Habit</h4>
+                            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                <input type="text" id="new-habit-name" placeholder="Enter habit name (e.g., Morning Run)" class="flex-grow px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                                <input type="text" id="new-habit-category" list="category-suggestions" placeholder="Category (optional)" class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white sm:w-36">
+                                <datalist id="category-suggestions">
+                                    <!-- Options populated by JS -->
+                                </datalist>
+                                <div class="flex gap-2 mt-2 sm:mt-0">
+                                    <button id="save-habit-btn" class="flex-1 sm:flex-none px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition text-sm font-medium">Save</button>
+                                    <button id="cancel-habit-btn" class="flex-1 sm:flex-none px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg transition dark:bg-gray-600 dark:text-white dark:hover:bg-gray-500 text-sm font-medium">Cancel</button>
+                                </div>
+                            </div>
+                        </div>
+
+                         <!-- Filters -->
+                         <div class="mb-4">
+                             <label for="category-filter" class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Filter by Category</label>
+                             <select id="category-filter" class="w-full md:w-auto px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:border-gray-700">
+                                 <option value="all">All Categories</option>
+                                 <!-- Categories populated by JS -->
+                             </select>
+                         </div>
+
+                        <!-- Habits List -->
+                        <div id="habits-container" class="space-y-4">
+                            <!-- Habit cards dynamically populated -->
+                        </div>
+                         <div id="no-habits-message" class="hidden text-center py-10">
+                             <i class="fas fa-list-alt text-gray-400 text-5xl mb-4"></i>
+                             <p class="text-gray-500 dark:text-gray-400">No habits tracked yet.</p>
+                             <p class="text-gray-500 dark:text-gray-400">Click "Add Habit" to get started!</p>
+                         </div>
+                         <div id="no-filtered-habits-message" class="hidden text-center py-10">
+                             <i class="fas fa-filter text-gray-400 text-5xl mb-4"></i>
+                             <p class="text-gray-500 dark:text-gray-400">No habits match the selected category.</p>
+                         </div>
+                    </div>
+                 </div>
+            </div>
+        </main>
+
+        <!-- Settings Panel -->
+        <aside id="settings-panel" class="settings-panel fixed top-0 right-0 w-full max-w-sm h-full bg-white dark:bg-gray-900 shadow-lg z-40 overflow-y-auto p-6 border-l border-gray-200 dark:border-gray-700">
+            <div class="flex justify-between items-center mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-100">Settings</h2>
+                <button id="close-settings-btn" class="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+
+            <div class="space-y-8">
+
+                <!-- Achievements -->
+                <section>
+                    <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-100 mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">Achievements</h3>
+                    <div id="achievements-list" class="grid grid-cols-2 gap-3">
+                        <!-- Badges populated by JS -->
+                    </div>
+                </section>
+
+                <!-- User Profiles -->
+                <section>
+                    <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-100 mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">User Profiles</h3>
+                    <div class="space-y-5">
+                        <div>
+                            <label for="user1-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">User 1 Name</label>
+                            <div class="flex items-center space-x-2">
+                                <input type="text" id="user1-name" class="flex-grow px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm dark:bg-gray-800 dark:border-gray-700">
+                                <input type="file" id="user1-avatar" accept="image/*" class="hidden">
+                                <button id="user1-avatar-btn" class="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition text-sm" title="Upload User 1 Avatar">
+                                    <i class="fas fa-image"></i>
+                                </button>
+                            </div>
+                             <img id="settings-user1-avatar-preview" class="mt-2 w-10 h-10 rounded-full object-cover bg-gray-200 dark:bg-gray-700" src="" alt="U1 Preview">
+                        </div>
+                         <div>
+                            <label for="user2-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">User 2 Name</label>
+                            <div class="flex items-center space-x-2">
+                                <input type="text" id="user2-name" class="flex-grow px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm dark:bg-gray-800 dark:border-gray-700">
+                                <input type="file" id="user2-avatar" accept="image/*" class="hidden">
+                                <button id="user2-avatar-btn" class="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition text-sm" title="Upload User 2 Avatar">
+                                    <i class="fas fa-image"></i>
+                                </button>
+                            </div>
+                             <img id="settings-user2-avatar-preview" class="mt-2 w-10 h-10 rounded-full object-cover bg-gray-200 dark:bg-gray-700" src="" alt="U2 Preview">
+                        </div>
+                        <button id="save-names-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg transition text-sm font-medium">
+                            Save User Profiles
+                        </button>
+                    </div>
+                </section>
+
+                 <!-- Habit Management -->
+                 <section>
+                    <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-100 mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">Manage Habits</h3>
+                    <div class="space-y-3">
+                        <button id="edit-habits-btn" class="w-full bg-yellow-500 hover:bg-yellow-600 text-black py-2 px-4 rounded-lg transition text-sm font-medium flex items-center justify-center space-x-2"> <!-- Text black for yellow -->
+                            <i class="fas fa-edit"></i><span>Edit / Delete Habits</span>
+                        </button>
+                        <button id="reset-all-btn" class="w-full bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-lg transition text-sm font-medium flex items-center justify-center space-x-2">
+                            <i class="fas fa-undo"></i><span>Reset All Counters & Notes</span>
+                        </button>
+                    </div>
+                </section>
+
+                <!-- App Settings -->
+                 <section>
+                    <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-100 mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">App Settings</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Dark Mode</span>
+                            <button id="dark-mode-toggle" class="relative inline-flex items-center h-6 rounded-full w-11 bg-gray-200 dark:bg-gray-600">
+                                <span class="sr-only">Toggle Dark Mode</span>
+                                <span class="inline-block w-4 h-4 transform bg-white dark:bg-gray-300 rounded-full transition"></span>
+                            </button>
+                        </div>
+                    </div>
+
+            <!-- Pair Invite Code -->
+            <section id="invite-code-section" class="hidden mt-6">
+                <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-100 mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">Invite Code</h3>
+                <div class="flex items-center space-x-2">
+                    <input id="invite-code-display" readonly class="flex-grow px-3 py-2 border border-gray-300 rounded-lg dark:bg-gray-800 dark:border-gray-700 dark:text-white text-center font-mono tracking-widest uppercase" value="">
+                    <button id="copy-invite-code-btn" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition text-sm">Copy</button>
+                </div>
+                <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Share this code with your partner to join the pair.</p>
+            </section>
+                </section>
+            </div>
+        </aside>
+
+         <!-- Modals Container -->
+         <div id="modals-container">
+            <!-- Edit Habits Modal -->
+            <div id="edit-habits-modal" class="fixed inset-0 flex items-center justify-center z-50 hidden modal-overlay p-4">
+                 <div class="modal-content bg-white dark:bg-gray-900 rounded-xl shadow-2xl p-6 max-w-lg w-full mx-auto max-h-[80vh] flex flex-col">
+                    <div class="flex justify-between items-center mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+                         <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-100">Edit Habits</h2>
+                         <button id="cancel-edit-habits-btn" class="p-1 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 transition">
+                             <i class="fas fa-times text-xl"></i>
+                         </button>
+                    </div>
+                    <div class="flex-grow overflow-y-auto pr-2 space-y-4">
+                        <div>
+                            <label for="edit-habits-user-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select User</label>
+                            <select id="edit-habits-user-select" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm">
+                                <option value="user1">User 1</option>
+                                <option value="user2">User 2</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Select Habit to Edit</label>
+                            <div id="edit-habits-list" class="space-y-2">
+                                <!-- Habit list populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Edit Single Habit Modal -->
+            <div id="edit-habit-modal" class="fixed inset-0 flex items-center justify-center z-50 hidden modal-overlay p-4">
+                <div class="modal-content bg-white dark:bg-gray-900 rounded-xl shadow-2xl p-6 max-w-lg w-full mx-auto max-h-[90vh] flex flex-col">
+                     <div class="flex justify-between items-center mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+                         <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-100">Edit Habit</h2>
+                         <button id="cancel-edit-habit-btn" class="p-1 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 transition">
+                             <i class="fas fa-times text-xl"></i>
+                         </button>
+                     </div>
+                    <div class="flex-grow overflow-y-auto pr-2 space-y-4">
+                        <div>
+                            <label for="edit-habit-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Habit Name</label>
+                            <input type="text" id="edit-habit-name" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm dark:bg-gray-800">
+                        </div>
+                        <div>
+                            <label for="edit-habit-category" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
+                            <input type="text" id="edit-habit-category" list="category-suggestions" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm dark:bg-gray-800" placeholder="e.g., Health, Work">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Edit Streak Chain (Click day to toggle)</label>
+                             <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Green = Completed, Gray = Missed</p>
+                            <div id="edit-chain-container" class="flex flex-wrap gap-1.5 p-2 bg-gray-100 dark:bg-gray-800 rounded-md max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-700">
+                            </div>
+                        </div>
+                        <div>
+                             <label for="edit-habit-note" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Note for Last Entry</label>
+                             <textarea id="edit-habit-note" rows="2" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm dark:bg-gray-800" placeholder="Add an optional note..."></textarea>
+                             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Note associated with the latest completed day.</p>
+                         </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Actions</label>
+                            <div class="flex flex-wrap gap-2">
+                                 <button id="reset-habit-btn" class="px-3 py-1.5 bg-yellow-500 hover:bg-yellow-600 text-black rounded-lg transition text-xs font-medium flex items-center space-x-1">
+                                    <i class="fas fa-undo"></i><span>Reset Chain</span>
+                                </button>
+                                <button id="delete-habit-btn" class="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-lg transition text-xs font-medium flex items-center space-x-1">
+                                    <i class="fas fa-trash-alt"></i><span>Delete Habit</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700 mt-4">
+                        <button id="save-edit-habit-btn" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition text-sm font-medium flex items-center space-x-1.5">
+                            <i class="fas fa-save"></i><span>Save Changes</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reset Confirmation Modal -->
+             <div id="reset-confirm-modal" class="fixed inset-0 flex items-center justify-center z-50 hidden modal-overlay p-4">
+                <div class="modal-content bg-white dark:bg-gray-900 rounded-xl shadow-2xl p-6 max-w-md w-full mx-auto">
+                    <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Confirm Reset</h2>
+                    <p class="text-gray-600 dark:text-gray-300 mb-6 text-sm">Are you sure you want to reset the counters (streak chains), best streaks, and notes for <span class="font-bold">all habits</span> for <span class="font-bold">both users</span>? This action cannot be undone and will sync across devices.</p>
+                    <div class="flex justify-end space-x-3">
+                        <button id="cancel-reset-btn" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg transition dark:bg-gray-600 dark:text-white dark:hover:bg-gray-500 text-sm font-medium">
+                            Cancel
+                        </button>
+                        <button id="confirm-reset-btn" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition text-sm font-medium">
+                            Yes, Reset All
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Delete Habit Confirmation Modal -->
+             <div id="delete-confirm-modal" class="fixed inset-0 flex items-center justify-center z-50 hidden modal-overlay p-4">
+                 <div class="modal-content bg-white dark:bg-gray-900 rounded-xl shadow-2xl p-6 max-w-md w-full mx-auto">
+                    <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Confirm Deletion</h2>
+                    <p class="text-gray-600 dark:text-gray-300 mb-6 text-sm">Are you sure you want to delete the habit "<span id="delete-habit-name-confirm" class="font-bold"></span>" for user <span id="delete-habit-user-confirm" class="font-bold"></span>? This will sync across devices and cannot be undone.</p>
+                    <div class="flex justify-end space-x-3">
+                        <button id="cancel-delete-btn" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg transition dark:bg-gray-600 dark:text-white dark:hover:bg-gray-500 text-sm font-medium">
+                            Cancel
+                        </button>
+                        <button id="confirm-delete-btn" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition text-sm font-medium">
+                            Delete Habit
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reset PIN Modal -->
+             <div id="reset-pin-modal" class="fixed inset-0 flex items-center justify-center z-50 hidden modal-overlay p-4">
+                <div class="modal-content bg-white dark:bg-gray-900 rounded-xl shadow-2xl p-6 max-w-md w-full mx-auto">
+                    <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Reset App PIN</h2>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">This PIN is specific to this device/browser and is not synced.</p>
+                    <div class="space-y-3">
+                        <div>
+                            <label for="current-pin" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Current PIN</label>
+                            <input type="password" id="current-pin" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm tracking-widest dark:bg-gray-800 dark:border-gray-700" placeholder="••••" maxlength="4" inputmode="numeric">
+                        </div>
+                        <div>
+                            <label for="new-pin" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">New PIN</label>
+                            <input type="password" id="new-pin" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm tracking-widest dark:bg-gray-800 dark:border-gray-700" placeholder="••••" maxlength="4" inputmode="numeric">
+                        </div>
+                        <div>
+                            <label for="confirm-new-pin" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Confirm New PIN</label>
+                            <input type="password" id="confirm-new-pin" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm tracking-widest dark:bg-gray-800 dark:border-gray-700" placeholder="••••" maxlength="4" inputmode="numeric">
+                        </div>
+                        <div id="reset-pin-error" class="text-red-500 dark:text-red-400 text-sm hidden"></div>
+                    </div>
+                    <div class="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700 mt-4">
+                        <button id="cancel-reset-pin-btn" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg transition dark:bg-gray-600 dark:text-white dark:hover:bg-gray-500 text-sm font-medium">
+                            Cancel
+                        </button>
+                        <button id="confirm-reset-pin-btn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition text-sm font-medium">
+                            Change PIN
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+         </div> <!-- End Modals Container -->
+
+        <!-- Global Notification Area -->
+        <div id="notification-area" class="fixed bottom-4 right-4 z-[100] space-y-2 w-full max-w-xs sm:max-w-sm"></div>
+
+    </div> <!-- End App Container -->
+
+    <!-- 
+        SCRIPT SECTION REMAINS THE SAME AS THE PREVIOUS VERSION. 
+        NO CHANGES NEEDED IN THE JAVASCRIPT LOGIC FOR THESE ICON/PWA ISSUES.
+    -->
+    <script>
+        // --- Firebase Configuration ---
+        // THIS IS NOW LOADED FROM firebase-config.js BEFORE THIS SCRIPT RUNS
+        // Ensure firebaseConfig is globally available from that file.
+        if (typeof firebaseConfig === 'undefined') {
+             console.error("CRITICAL: firebaseConfig is not defined. Make sure firebase-config.js is loaded correctly before this script and contains your Firebase configuration.");
+             alert("Error: Firebase configuration is missing. App cannot start.");
+             // Optionally, hide the app and show an error message permanently
+             document.getElementById('app-container')?.classList.add('hidden');
+             document.getElementById('login-screen')?.classList.add('hidden'); // Hide login too
+             document.body.innerHTML = '<div style="padding: 20px; text-align: center; color: red;">App initialization failed: Missing Firebase config.</div>';
+        }
+
+        // --- Initialize Firebase ---
+        let firebaseApp;
+        let db;
+        // let dbRef; // REMOVED: Reference is now dynamic based on pairCode
+        let dataListener = null; // To keep track of the listener
+        let isSaving = false; // Flag to prevent rapid saves
+        let saveTimeoutId = null; // For debouncing saves
+        let isUpdatingFromRemote = false; // Flag to prevent save loop on remote update
+
+        try {
+            // Check if firebaseConfig is defined before initializing
+            if (typeof firebaseConfig !== 'undefined') {
+                 console.log("Attempting to initialize Firebase..."); // DEBUG LOG
+                 firebaseApp = firebase.initializeApp(firebaseConfig);
+                 db = firebase.database();
+                 // dbRef = db.ref('/chainTrackData'); // REMOVED: Path is now dynamic
+                 console.log("Firebase initialized successfully."); // DEBUG LOG
+            } else {
+                 // Error already logged above, re-throwing to be caught by outer catch
+                 throw new Error("firebaseConfig is undefined.");
+            }
+        } catch (error) {
+            console.error("Firebase initialization failed:", error); // KEEP THIS
+            alert("Critical Error: Could not connect to the database. Please check your internet connection and Firebase configuration in firebase-config.js.");
+            // Optionally display error more permanently
+            document.getElementById('app-container')?.classList.add('hidden');
+            document.getElementById('login-screen')?.classList.add('hidden');
+            document.body.innerHTML = '<div style="padding: 20px; text-align: center; color: red;">Firebase initialization failed. Check console (F12) and firebase-config.js.</div>';
+        }
+
+
+        // --- App State ---
+        const defaultState = {
+            habits: { user1: [], user2: [] },
+            userNames: { user1: 'User 1', user2: 'User 2' },
+            userAvatars: { user1: '', user2: '' },
+            notes: {},
+            categories: ['General'],
+            lastTrackedDate: {},
+        };
+
+        // Local state will now hold both synced and local-only data
+        const state = {
+            // Synced parts (will be loaded/saved from/to Firebase)
+            ...JSON.parse(JSON.stringify(defaultState)), // Deep copy default state initially
+
+            // Local-only parts (will use localStorage)
+            currentUser: 'user1',
+            currentView: 'user',
+            theme: 'light', // Default to light, will be overwritten by localStorage
+            appPin: '9966', // PIN remains local to the device
+            pendingUndo: null,
+        };
+
+        const DEFAULT_AVATAR = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzkwYTBhZSI+PHBhdGggZD0iTTEyIDEyYzIuMjEgMCA0LTEuNzkgNC00cy0xLjc5LTQtNC00LTQgMS43OS00IDRzMS43OSA0IDQgNHptMCAyYy0yLjY3IDAtOCAxLjM0LTggNHYyaDE2di0yYzAtMi42Ni01LjMzLTQtOC00eiIvPjwvc3ZnPg==';
+
+        const motivationalQuotes = [
+            { text: "The secret of getting ahead is getting started.", author: "Mark Twain" },
+            { text: "It does not matter how slowly you go as long as you do not stop.", author: "Confucius" },
+            { text: "We are what we repeatedly do. Excellence, then, is not an act, but a habit.", author: "Aristotle" },
+            { text: "Your habits will determine your future.", author: "Jack Canfield" },
+            { text: "Motivation is what gets you started. Habit is what keeps you going.", author: "Jim Ryun" },
+            { text: "Success is the sum of small efforts, repeated day in and day out.", author: "Robert Collier" },
+            { text: "The chains of habit are too weak to be felt until they are too strong to be broken.", author: "Samuel Johnson" },
+            { text: "Consistency is the key to achieving and maintaining momentum.", author: "Darren Hardy" },
+            { text: "Small daily improvements are the key to staggering long-term results.", author: "Unknown" },
+            { text: "Discipline is choosing between what you want now and what you want most.", author: "Abraham Lincoln" },
+            { text: "Don't watch the clock; do what it does. Keep going.", author: "Sam Levenson" },
+            { text: "The difference between who you are and who you want to be is what you do.", author: "Unknown" },
+            { text: "You do not rise to the level of your goals. You fall to the level of your systems.", author: "James Clear" },
+            { text: "First forget inspiration. Habit is more dependable.", author: "Octavia Butler" },
+            { text: "Sow a thought, reap an action; sow an action, reap a habit; sow a habit, reap a character; sow a character, reap a destiny.", author: "Stephen Covey" }
+        ];
+
+        // --- DOM Element Access ---
+        const getEl = (id) => document.getElementById(id);
+        const queryEl = (selector) => document.querySelector(selector);
+        const queryAllEl = (selector) => document.querySelectorAll(selector);
+
+        let comparisonChart = null;
+        let undoTimeoutId = null;
+
+        // --- Utility Functions --- (Keep these as they are)
+        function stringToColorClass(str) {
+             let hash = 0;
+             if (!str || str.length === 0) return 'gray';
+             for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+             const colors = ['indigo', 'green', 'blue', 'pink', 'purple', 'yellow', 'teal', 'red', 'orange'];
+             return colors[Math.abs(hash) % colors.length];
+        }
+        function getHabitIcon(habitName) {
+             if (!habitName) return 'fa-link';
+             const nameLower = habitName.toLowerCase();
+             if (nameLower.includes('run') || nameLower.includes('walk') || nameLower.includes('exercise') || nameLower.includes('gym')) return 'fa-person-running';
+             if (nameLower.includes('read') || nameLower.includes('book')) return 'fa-book-open';
+             if (nameLower.includes('meditate') || nameLower.includes('mindful') || nameLower.includes('breath')) return 'fa-brain';
+             if (nameLower.includes('water') || nameLower.includes('drink')) return 'fa-glass-water';
+             if (nameLower.includes('journal') || nameLower.includes('write')) return 'fa-pencil-alt';
+             if (nameLower.includes('sleep') || nameLower.includes('wake')) return 'fa-bed';
+             if (nameLower.includes('code') || nameLower.includes('study') || nameLower.includes('learn')) return 'fa-laptop-code';
+             if (nameLower.includes('clean') || nameLower.includes('tidy')) return 'fa-broom';
+             if (nameLower.includes('plan') || nameLower.includes('review')) return 'fa-calendar-check';
+             return 'fa-link';
+        }
+        function calculateStreak(chain) {
+             if (!Array.isArray(chain)) return 0; let cs = 0; for (let i = chain.length - 1; i >= 0; i--) { if (chain[i]) cs++; else break; } return cs;
+        }
+        function calculateAndUpdateBestStreak(habit) {
+            if (!habit || !Array.isArray(habit.chain)) return 0; let bs = 0; let cs = 0;
+            habit.chain.forEach(day => { if (day) cs++; else { bs = Math.max(bs, cs); cs = 0; } });
+            bs = Math.max(bs, cs); habit.bestStreak = Math.max(habit.bestStreak || 0, bs); return habit.bestStreak;
+        }
+        function calculateCompletionRate(chain) { if (!Array.isArray(chain) || chain.length === 0) return 0; return Math.round((chain.filter(d => d).length / chain.length) * 100); }
+        function getTodayDateString() { return new Date().toISOString().split('T')[0]; }
+        function hasTrackedToday(userId, habitId) { return state.lastTrackedDate[`${userId}-${habitId}`] === getTodayDateString(); }
+
+
+        // --- State Management (Modified for Firebase) ---
+
+        function loadLocalState() {
+            // Load only theme and PIN from localStorage
+            state.theme = localStorage.getItem('theme') || 'light'; // Keep light as default if nothing stored
+            state.appPin = localStorage.getItem('appPin') || '9966'; // Load PIN or default
+            state.currentUser = localStorage.getItem('lastUser') || 'user1'; // Remember last user locally
+            state.currentView = localStorage.getItem('lastView') || 'user'; // Remember last view locally
+            console.log("loadLocalState: Loaded theme, pin, user, view.", state.theme, state.appPin, state.currentUser, state.currentView); // DEBUG LOG
+        }
+
+        function saveLocalState() {
+            // Save only theme, PIN, and UI state to localStorage
+            localStorage.setItem('theme', state.theme);
+            localStorage.setItem('appPin', state.appPin);
+            localStorage.setItem('lastUser', state.currentUser);
+            localStorage.setItem('lastView', state.currentView);
+            console.log("saveLocalState: Saved theme, pin, user, view.", state.theme, state.appPin, state.currentUser, state.currentView); // DEBUG LOG
+        }
+
+        function loadSharedStateFromFirebase() {
+             console.log("Attempting to load shared state from Firebase..."); // DEBUG LOG
+             const pairCode = localStorage.getItem('pairCode');
+             if (!pairCode) {
+                 console.error("loadSharedStateFromFirebase: pairCode not found in localStorage.");
+                 showNotification("Pair information missing. Cannot load data.", "error");
+                 return Promise.reject("Missing pairCode");
+             }
+             if (!db) {
+                 console.error("loadSharedStateFromFirebase: Firebase DB not initialized.");
+                 return Promise.reject("Firebase DB not initialized");
+             }
+
+             const pairRef = db.ref(`/pairs/${pairCode}`);
+             console.log("loadSharedStateFromFirebase: Reading from path:", pairRef.toString()); // DEBUG LOG
+             getEl('loading-indicator')?.classList.remove('hidden'); // Show loading
+
+             return new Promise((resolve, reject) => {
+                 pairRef.get().then((snapshot) => {
+                    console.log("Firebase snapshot received. Exists:", snapshot.exists()); // DEBUG LOG
+                     if (snapshot.exists()) {
+                         const remotePairData = snapshot.val();
+                         console.log("Firebase pair data raw:", remotePairData ? JSON.stringify(remotePairData).substring(0, 300) + "..." : "null"); // DEBUG LOG (Truncated)
+
+                         // Construct the shared state parts from the pair data
+                         const mergedState = {
+                             habits: {
+                                 user1: (remotePairData?.user1?.habits || []).map(processHabit).filter(h=>h), // Habits under user role
+                                 user2: (remotePairData?.user2?.habits || []).map(processHabit).filter(h=>h)  // Habits under user role
+                             },
+                             userNames: remotePairData?.userNames || defaultState.userNames, // Shared directly under pair
+                             userAvatars: remotePairData?.userAvatars || defaultState.userAvatars, // Shared directly under pair
+                             notes: { // Notes need merging from both users
+                                 ...(remotePairData?.user1?.notes || {}),
+                                 ...(remotePairData?.user2?.notes || {})
+                             },
+                             lastTrackedDate: { // Tracked dates need merging from both users
+                                 ...(remotePairData?.user1?.lastTrackedDate || {}),
+                                 ...(remotePairData?.user2?.lastTrackedDate || {})
+                             }
+                         };
+                         // Update the shared parts of the local state object
+                         Object.assign(state, mergedState);
+                         console.log("Local state updated with Firebase data."); // DEBUG LOG
+                     } else {
+                         console.log("No data found in Firebase, using default state."); // DEBUG LOG
+                         // Ensure local state has the default shared structure if nothing in Firebase
+                         Object.assign(state, JSON.parse(JSON.stringify(defaultState)));
+                     }
+                     updateCategoriesFromHabits(); // Update categories based on loaded habits
+                     console.log("Categories updated from loaded habits."); // DEBUG LOG
+                     // Setup the real-time listener AFTER initial load
+                     setupFirebaseListener();
+                     resolve(); // Indicate successful load/setup
+                 }).catch((error) => {
+                     console.error("Error getting data from Firebase:", error); // KEEP THIS
+                     showNotification("Error loading data from cloud.", "error");
+                     reject(error);
+                 }).finally(() => {
+                      getEl('loading-indicator')?.classList.add('hidden'); // Hide loading
+                 });
+             });
+         }
+
+         function setupFirebaseListener() {
+             const pairCode = localStorage.getItem('pairCode');
+             if (!pairCode) {
+                 console.error("setupFirebaseListener: pairCode not found in localStorage.");
+                 return;
+             }
+             if (!db) {
+                 console.error("setupFirebaseListener: Firebase DB not initialized.");
+                 return;
+             }
+
+             const pairRef = db.ref(`/pairs/${pairCode}`);
+             console.log("setupFirebaseListener: Setting up listener on path:", pairRef.toString()); // DEBUG LOG
+
+             // Detach previous listener if any (using the correct ref)
+             if (dataListener && dataListener.ref && dataListener.callback) {
+                 dataListener.ref.off('value', dataListener.callback);
+                 console.log("Detached existing Firebase listener."); // DEBUG LOG
+             }
+
+             updateSyncStatus("Listening...");
+
+             const listenerCallback = (snapshot) => {
+                 console.log("Firebase listener received data update. isUpdating:", isUpdatingFromRemote, "isSaving:", isSaving); // DEBUG LOG
+                 if (isUpdatingFromRemote || isSaving) {
+                     console.log("Skipping update processing (isUpdatingFromRemote or isSaving is true)."); // DEBUG LOG
+                     return; // Avoid processing updates triggered by this client's own save or during another remote update processing
+                 }
+
+                 isUpdatingFromRemote = true; // Set flag
+                 updateSyncStatus("Updating...");
+
+                 try {
+                     const remotePairData = snapshot.val();
+                     if (remotePairData) {
+                        console.log("Listener received raw pair data:", JSON.stringify(remotePairData).substring(0, 300) + "..."); // DEBUG LOG
+                         // Construct the shared state parts from the pair data
+                         const mergedState = {
+                             habits: {
+                                 user1: (remotePairData?.user1?.habits || []).map(processHabit).filter(h=>h),
+                                 user2: (remotePairData?.user2?.habits || []).map(processHabit).filter(h=>h)
+                             },
+                             userNames: remotePairData?.userNames || defaultState.userNames,
+                             userAvatars: remotePairData?.userAvatars || defaultState.userAvatars,
+                             notes: {
+                                 ...(remotePairData?.user1?.notes || {}),
+                                 ...(remotePairData?.user2?.notes || {})
+                             },
+                             lastTrackedDate: {
+                                 ...(remotePairData?.user1?.lastTrackedDate || {}),
+                                 ...(remotePairData?.user2?.lastTrackedDate || {})
+                             }
+                         };
+
+                         // Update the shared parts of the local state object
+                         Object.assign(state, mergedState);
+                         console.log("Local state updated by Firebase listener."); // DEBUG LOG
+
+                         // --- Explicitly call UI updates ---
+                         console.log("Listener: Calling UI update functions..."); // DEBUG LOG
+                         updateCategoriesFromHabits();
+                         populateCategoryFilterAndSuggestions();
+                         updateUserDisplayNames();
+                         updateAvatarDisplays();
+                         renderCurrentView(); // This should render habits/dashboard
+                         console.log("Listener: UI update functions called."); // DEBUG LOG
+                         // --- End UI updates ---
+
+                         showNotification("Data synced from other device.", "info", 1500);
+                         updateSyncStatus("Synced");
+                     } else {
+                          console.log("Listener received empty data (perhaps deleted). Resetting shared state locally."); // DEBUG LOG
+                          Object.assign(state, JSON.parse(JSON.stringify(defaultState)));
+                          // --- Explicitly call UI updates after reset ---
+                          console.log("Listener (empty data): Calling UI update functions..."); // DEBUG LOG
+                          updateCategoriesFromHabits();
+                          populateCategoryFilterAndSuggestions();
+                          updateUserDisplayNames();
+                          updateAvatarDisplays();
+                          renderCurrentView();
+                          console.log("Listener (empty data): UI update functions called."); // DEBUG LOG
+                          // --- End UI updates ---
+                          updateSyncStatus("Data cleared remotely");
+                     }
+                 } catch (error) {
+                     console.error("Error processing Firebase update:", error); // KEEP THIS
+                     showNotification("Error applying synced data.", "error");
+                     updateSyncStatus("Error");
+                 } finally {
+                     // Use setTimeout to release the flag slightly later, allowing UI updates to settle
+                     setTimeout(() => {
+                         isUpdatingFromRemote = false;
+                         console.log("Finished processing remote update."); // DEBUG LOG
+                     }, 100); // Adjust delay if needed
+                 }
+             };
+
+             pairRef.on('value', listenerCallback, (error) => {
+                 console.error("Firebase listener error:", error); // KEEP THIS
+                 showNotification("Database connection error.", "error");
+                 updateSyncStatus("Error");
+                 dataListener = null; // Clear listener state on error
+             });
+
+             // Store the reference and callback for later detachment
+             dataListener = { ref: pairRef, callback: listenerCallback };
+         }
+
+         function updateSyncStatus(statusText) {
+             const statusEl = getEl('sync-status');
+             const textEl = getEl('sync-status-text');
+             if (statusEl && textEl) {
+                 statusEl.classList.remove('hidden');
+                 textEl.textContent = statusText;
+                 // Optional: Change icon/color based on status
+                 const iconEl = statusEl.querySelector('i');
+                 if (statusText === "Synced") {
+                    iconEl.className = 'fas fa-check-circle text-green-500';
+                 } else if (statusText === "Error") {
+                    iconEl.className = 'fas fa-exclamation-circle text-red-500';
+                 } else { // Syncing, Updating, Listening...
+                    iconEl.className = 'fas fa-sync fa-spin text-blue-500';
+                 }
+             }
+         }
+
+        function saveSharedStateToFirebase() {
+            const pairCode = localStorage.getItem('pairCode');
+            const userRole = localStorage.getItem('userRole'); // 'user1' or 'user2'
+
+            if (!pairCode || !userRole) {
+                 console.error("Cannot save state: Missing pairCode or userRole in localStorage.");
+                 showNotification("Error: Cannot save data (missing pair info).", "error");
+                 return;
+            }
+             if (!db) {
+                 console.error("Cannot save state: Firebase DB not initialized.");
+                 showNotification("Error: Cannot save data.", "error");
+                 return;
+             }
+            if (isUpdatingFromRemote) {
+                console.log("Skipping save: Currently processing remote update."); // DEBUG LOG
+                return;
+            }
+
+            // Debounce the save operation
+            clearTimeout(saveTimeoutId);
+            isSaving = true; // Set flag immediately
+            updateSyncStatus("Saving...");
+
+            saveTimeoutId = setTimeout(() => {
+                 const pairRef = db.ref(`/pairs/${pairCode}`);
+                 console.log("Attempting to save shared state to Firebase path:", pairRef.toString()); // DEBUG LOG
+
+                 // Prepare updates object - only include data for the current user and shared profile info
+                 const updates = {};
+                 updates[`${userRole}/habits`] = state.habits?.[userRole] || []; // Save only current user's habits
+                 updates['userNames'] = state.userNames || defaultState.userNames; // Save shared names
+                 updates['userAvatars'] = state.userAvatars || defaultState.userAvatars; // Save shared avatars
+
+                 // Separate notes by user for saving
+                 const userNotes = {};
+                 Object.keys(state.notes || {}).forEach(key => {
+                     if (key.startsWith(`${userRole}-`)) {
+                         userNotes[key] = state.notes[key];
+                     }
+                 });
+                 updates[`${userRole}/notes`] = userNotes;
+
+                 // Save the entire lastTrackedDate object under the pair (shared)
+                 updates['lastTrackedDate'] = state.lastTrackedDate || {};
+
+
+                 console.log("Data updates to save:", JSON.stringify(updates).substring(0, 200) + "..."); // DEBUG LOG (Truncate for brevity)
+
+                 pairRef.update(updates) // Use update() instead of set()
+                    .then(() => {
+                        console.log("Shared state successfully updated in Firebase."); // DEBUG LOG
+                        updateSyncStatus("Synced");
+                    })
+                    .catch((error) => {
+                        console.error("Error saving state to Firebase:", error); // KEEP THIS
+                        showNotification("Error saving data to cloud.", "error");
+                        updateSyncStatus("Error");
+                    })
+                    .finally(() => {
+                        // Release the flag slightly after the operation completes
+                         setTimeout(() => {
+                             isSaving = false;
+                             console.log("Save operation finished, isSaving set to false."); // DEBUG LOG
+                         }, 100);
+                    });
+            }, 300); // Debounce time in milliseconds (e.g., 300ms)
+        }
+
+        // Helper function to ensure habits have default props (used during loading/updates)
+        function processHabit(h) {
+            if (!h || typeof h !== 'object' || !h.id || !h.name) { // Add more robust check
+                console.warn("Processing invalid habit data:", h); // DEBUG LOG
+                return null; // Handle potential null/undefined/invalid entries
+            }
+            const processed = {
+                id: h.id,
+                name: h.name,
+                chain: Array.isArray(h.chain) ? h.chain : [],
+                category: h.category || 'General',
+                bestStreak: h.bestStreak || 0,
+            };
+            // Ensure bestStreak is calculated if missing or potentially incorrect
+            // Note: Calling calculateAndUpdateBestStreak here modifies the object directly
+            calculateAndUpdateBestStreak(processed);
+            return processed;
+        }
+
+
+        function updateCategoriesFromHabits() {
+             const categoriesInUse = new Set(['General']);
+             // Ensure habits and user arrays exist before iterating
+             const user1Habits = state.habits?.user1 || [];
+             const user2Habits = state.habits?.user2 || [];
+
+             [...user1Habits, ...user2Habits]
+                .filter(h => h) // Filter out any null/undefined habits from processing
+                .forEach(h => { if (h.category) categoriesInUse.add(h.category); });
+             state.categories = Array.from(categoriesInUse).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+             console.log("updateCategoriesFromHabits: Updated categories:", state.categories); // DEBUG LOG
+         }
+
+        // --- UI Update Functions ---
+        function applyTheme() {
+             const isDark = state.theme === 'dark';
+             document.documentElement.classList.toggle('dark', isDark);
+
+             const toggle = getEl('dark-mode-toggle');
+             // Explicitly set background color based on state
+             toggle.classList.toggle('bg-indigo-600', isDark); // Indigo when dark mode is ON
+             toggle.classList.toggle('bg-gray-200', !isDark); // Gray when dark mode is OFF
+
+             // Update the toggle switch handle position
+             toggle.querySelector('span:last-child').classList.toggle('translate-x-5', isDark);
+
+             // Update icons visibility based on theme
+             getEl('theme-toggle').querySelector('.fa-moon').classList.toggle('hidden', !isDark);
+             getEl('theme-toggle').querySelector('.fa-sun').classList.toggle('hidden', isDark);
+
+             if (comparisonChart) renderDashboardChart(); // Update chart theme
+             console.log("applyTheme: Theme set to", state.theme); // DEBUG LOG
+         }
+        function displayQuote() {
+             const quote = motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)];
+             getEl('quote-text').textContent = `"${quote.text}"`; getEl('quote-author').textContent = `- ${quote.author}`;
+             getEl('quote-container').style.opacity = 1;
+             console.log("displayQuote: Displayed quote."); // DEBUG LOG
+        }
+        function updateAvatarDisplays() {
+            const av1 = state.userAvatars?.user1 || DEFAULT_AVATAR; // Add safe navigation
+            const av2 = state.userAvatars?.user2 || DEFAULT_AVATAR; // Add safe navigation
+            getEl('btn-user1-avatar').src = av1; getEl('btn-user2-avatar').src = av2;
+            getEl('dashboard-user1-avatar').src = av1; getEl('dashboard-user2-avatar').src = av2;
+            getEl('settings-user1-avatar-preview').src = av1; getEl('settings-user2-avatar-preview').src = av2;
+            // Update current user avatar only if user-view is potentially active
+            if (getEl('current-user-avatar')) {
+                 getEl('current-user-avatar').src = state.currentUser === 'user1' ? av1 : av2;
+            }
+            console.log("updateAvatarDisplays: Updated avatar images."); // DEBUG LOG
+        }
+        function updateUserDisplayNames() {
+            const n1 = state.userNames?.user1 || 'User 1'; // Add safe navigation
+            const n2 = state.userNames?.user2 || 'User 2'; // Add safe navigation
+            getEl('btn-user1-name').textContent = n1; getEl('btn-user2-name').textContent = n2;
+            getEl('dashboard-user1-name').textContent = n1 + " Stats"; getEl('dashboard-user2-name').textContent = n2 + " Stats";
+            getEl('user1-name').value = n1; getEl('user2-name').value = n2;
+            try { // Keep try-catch for elements that might not exist early
+                 getEl('edit-habits-user-select').options[0].text = n1;
+                 getEl('edit-habits-user-select').options[1].text = n2;
+            } catch(e) {
+                 console.warn("Failed to update names in edit-habits-user-select (might not exist yet)");
+            }
+            if (getEl('current-user')) {
+                getEl('current-user').textContent = state.userNames?.[state.currentUser] || (state.currentUser === 'user1' ? 'User 1' : 'User 2');
+            }
+             // Update delete confirmation modal user name span if it exists
+             if (getEl('delete-habit-user-confirm') && getEl('delete-confirm-modal').dataset.habitUser) {
+                 const delUserKey = getEl('delete-confirm-modal').dataset.habitUser;
+                 getEl('delete-habit-user-confirm').textContent = state.userNames?.[delUserKey] || (delUserKey === 'user1' ? 'User 1' : 'User 2');
+             }
+            console.log("updateUserDisplayNames: Updated names:", n1, n2); // DEBUG LOG
+        }
+        function updateViewSpecificStyles() {
+             console.log("updateViewSpecificStyles: Updating for view:", state.currentView, "user:", state.currentUser); // DEBUG LOG
+             const buttons = [getEl('user1-btn'), getEl('user2-btn'), getEl('compare-btn')];
+             const activeCls = 'bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 font-semibold ring-1 ring-indigo-300 dark:ring-indigo-600';
+             const inactiveCls = 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300';
+             const compareActiveCls = activeCls.split(' ').map(c => c.replace('indigo', 'purple')).join(' '); // Adjusted to join
+
+             buttons.forEach(btn => {
+                if(btn) { // Check if button exists
+                    // More robust class removal
+                    btn.classList.remove(...activeCls.split(' '));
+                    btn.classList.remove(...inactiveCls.split(' '));
+                    btn.classList.remove(...compareActiveCls.split(' '));
+
+                    let isActive = false;
+                    let isCompare = false;
+
+                    if (state.currentView === 'user') {
+                        if (btn.id === (state.currentUser === 'user1' ? 'user1-btn' : 'user2-btn')) {
+                            isActive = true;
+                        }
+                    } else if (state.currentView === 'compare') {
+                         if (btn.id === 'compare-btn') {
+                             isActive = true;
+                             isCompare = true;
+                         }
+                    }
+
+                    if (isActive) {
+                        btn.classList.add(...(isCompare ? compareActiveCls : activeCls).split(' '));
+                    } else {
+                        btn.classList.add(...inactiveCls.split(' '));
+                    }
+                }
+             });
+
+             saveLocalState(); // Save current view/user locally
+             renderCurrentView(); // Render content based on the new state
+         }
+
+        function renderCurrentView() {
+             console.log("renderCurrentView: Rendering view:", state.currentView); // DEBUG LOG
+             getEl('user-view').classList.toggle('hidden', state.currentView !== 'user');
+             getEl('dashboard-view').classList.toggle('hidden', state.currentView !== 'compare');
+
+             if (state.currentView === 'user') {
+                 renderHabits();
+             } else if (state.currentView === 'compare') {
+                 renderDashboard();
+             }
+         }
+        function updateOverallStreakDisplay() {
+             // Add safe navigation
+             const userHabits = state.habits?.[state.currentUser] || [];
+             if (userHabits.length === 0) { getEl('streak-days').textContent = '0'; getEl('streak-icon').classList.add('hidden'); return; }
+             const bestStreaks = userHabits.map(h => h?.bestStreak || 0); // Safe navigation
+             const overallMaxStreak = Math.max(0, ...bestStreaks);
+             getEl('streak-days').textContent = overallMaxStreak;
+             getEl('streak-icon').classList.toggle('hidden', overallMaxStreak <= 7);
+             console.log("updateOverallStreakDisplay: Overall max streak for", state.currentUser, "is", overallMaxStreak); // DEBUG LOG
+        }
+        function populateCategoryFilterAndSuggestions() {
+             const select = getEl('category-filter'); const datalist = getEl('category-suggestions');
+             if (!select || !datalist) return; // Ensure elements exist
+             const currentVal = select.value; select.innerHTML = '<option value="all">All Categories</option>'; datalist.innerHTML = '';
+             state.categories.forEach(cat => { const opt = document.createElement('option'); opt.value = cat; opt.textContent = cat; select.appendChild(opt.cloneNode(true)); datalist.appendChild(opt); });
+             select.value = state.categories.includes(currentVal) ? currentVal : 'all'; // Keep selection if valid
+             console.log("populateCategoryFilterAndSuggestions: Populated categories. Current filter:", select.value); // DEBUG LOG
+        }
+
+        // --- Habit Rendering ---
+        function renderHabits() {
+            console.log("renderHabits: Rendering habits for user:", state.currentUser); // DEBUG LOG
+            const container = getEl('habits-container');
+            const noHabitsMsg = getEl('no-habits-message'); const noFilteredMsg = getEl('no-filtered-habits-message');
+            if (!container || !noHabitsMsg || !noFilteredMsg) {
+                console.error("renderHabits: Core elements not found!"); return;
+            }
+            container.innerHTML = '';
+            clearPendingUndo(); // Clear any pending undo state visually
+
+            }
+            container.innerHTML = '';
+            clearPendingUndo(); // Clear any pending undo state visually
+
+            const userHabits = state.habits?.[state.currentUser] || []; // Safe navigation
+            const selectedCategory = getEl('category-filter').value;
+            const filteredHabits = (selectedCategory === 'all')
+                ? userHabits
+                : userHabits.filter(h => h && h.category === selectedCategory); // Add check for h existence
+
+            console.log("renderHabits: Total habits:", userHabits.length, "Filtered habits:", filteredHabits.length, "Category:", selectedCategory); // DEBUG LOG
+
+            noHabitsMsg.classList.toggle('hidden', userHabits.length > 0);
+            noFilteredMsg.classList.toggle('hidden', userHabits.length === 0 || selectedCategory === 'all' || filteredHabits.length > 0);
+
+            if (filteredHabits.length > 0) {
+                filteredHabits.forEach((habit, index) => {
+                    if (!habit || !habit.id) { // Extra safety check
+                        console.warn("renderHabits: Skipping invalid habit in loop:", habit);
+                        return;
+                    }
+
+                    const card = document.createElement('div');
+                    card.className = 'relative habit-card bg-white dark:bg-gray-900 rounded-lg shadow-sm p-4 slide-up border-l-4 border-transparent';
+                    card.style.animationDelay = `${index * 0.05}s`; card.dataset.habitId = habit.id; card.dataset.userId = state.currentUser;
+
+                    const currentStreak = calculateStreak(habit.chain);
+                    const bestStreak = habit.bestStreak || 0;
+                    const isTracked = hasTrackedToday(state.currentUser, habit.id);
+                    const rate = calculateCompletionRate(habit.chain);
+                    const chain = habit.chain || []; const len = chain.length;
+                    const colorName = stringToColorClass(habit.category || 'General'); const colorVar = `--color-${colorName}-500`;
+                    card.style.borderLeftColor = `var(${colorVar}, #6b7280)`;
+                    const icon = getHabitIcon(habit.name);
+
+                    let note = null; let noteTitle = '';
+                     // Display note associated with today if tracked today
+                     if (isTracked) {
+                         const dateStr = getTodayDateString();
+                         const noteKey = `${state.currentUser}-${habit.id}-${dateStr}`;
+                         note = state.notes?.[noteKey]; // Safe navigation
+                         noteTitle = note ? `Note for today: ${note.substring(0, 50)}${note.length > 50 ? '...' : ''}` : '';
+                    }
+
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="flex items-center flex-wrap gap-x-2">
+                                <i class="fas ${icon} habit-icon" style="color: var(${colorVar})"></i>
+                                <h3 class="font-semibold text-lg text-gray-800 dark:text-gray-100">${habit.name || 'Unnamed'}</h3>
+                                ${note ? `<i class="fas fa-sticky-note text-xs text-yellow-400 cursor-help" title="${noteTitle}"></i>` : ''}
+                            </div>
+                            <button data-habit-id="${habit.id}" class="track-btn shrink-0 px-3 py-1.5 text-white rounded-lg transition text-xs font-medium flex items-center space-x-1 shadow disabled:opacity-70 disabled:cursor-not-allowed disabled:shadow-none" ${isTracked ? 'disabled' : ''} style="background-color: var(${colorVar});">
+                                <i class="fas ${isTracked ? 'fa-check' : 'fa-plus'} text-xs"></i><span>${isTracked ? 'Done!' : 'Track'}</span>
+                            </button>
+                        </div>
+                        <div class="mb-3"><span class="category-tag text-white" style="background-color: var(${colorVar})">${habit.category || 'General'}</span></div>
+                        <div class="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400 mb-3">
+                            <span>Current: <strong class="text-gray-700 dark:text-gray-200 ${currentStreak > 7 ? 'text-orange-500' : ''}">${currentStreak}</strong> ${currentStreak > 7 ? '<i class="fas fa-fire text-orange-500 streak-fire text-xs"></i>' : ''}</span>
+                            <span>Best: <strong class="text-gray-700 dark:text-gray-200">${bestStreak} <i class="fas fa-star text-yellow-400 text-xs"></i></strong></span>
+                            <span>Rate: <strong class="text-gray-700 dark:text-gray-200">${rate}%</strong></span>
+                        </div>
+                        <div class="chain-container flex flex-wrap gap-1">
+                             ${len > 0 ? chain.slice(-28).map((day, i) => `<div class="chain-link w-5 h-5 rounded transition ${day ? '' : 'bg-gray-200 dark:bg-gray-700'}" style="background-color: ${day ? `var(${colorVar})` : ''}" title="Day ${Math.max(0, len - 28) + i + 1}"></div>`).join('') : '<span class="text-xs text-gray-400">No history yet.</span>'}
+                        </div>
+                        <button data-habit-id="${habit.id}" class="undo-button absolute bottom-2 right-2 px-2 py-1 bg-yellow-500 hover:bg-yellow-600 text-black rounded text-xs opacity-0 transition duration-300 ease-in-out pointer-events-none transform translate-y-2"> <i class="fas fa-undo mr-1"></i> Undo </button>
+                    `;
+                    container.appendChild(card);
+                });
+            } else {
+                console.log("renderHabits: No habits to display for this filter/user."); // DEBUG LOG
+            }
+            updateOverallStreakDisplay(); // Update the header streak info
+        }
+
+        // --- Dashboard Rendering ---
+        function renderDashboardStats(userId) {
+            console.log("renderDashboardStats: Calculating stats for", userId); // DEBUG LOG
+            const userHabits = state.habits?.[userId] || []; // Safe navigation
+            const statsEl = getEl(userId === 'user1' ? 'user1-stats' : 'user2-stats');
+            if (!statsEl) return;
+
+            const curStreaks = userHabits.map(h => calculateStreak(h?.chain)); // Safe navigation
+            const maxCur = Math.max(0, ...curStreaks);
+            const bestStreaks = userHabits.map(h => h?.bestStreak || 0); // Safe navigation
+            const maxBest = Math.max(0, ...bestStreaks);
+            const rates = userHabits.map(h => calculateCompletionRate(h?.chain)); // Safe navigation
+            const validRates = rates.filter(r => !isNaN(r)); // Filter out NaN if chain was empty/invalid
+            const avgRate = validRates.length ? Math.round(validRates.reduce((s, r) => s + r, 0) / validRates.length) : 0;
+            const totalDone = userHabits.reduce((s, h) => s + (h?.chain || []).filter(d => d).length, 0); // Safe navigation
+            const totalTracked = userHabits.reduce((s, h) => s + (h?.chain || []).length, 0); // Safe navigation
+
+            statsEl.innerHTML = `
+                <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Habits:</span><strong class="dark:text-gray-100">${userHabits.length}</strong></div>
+                <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Longest Current:</span><strong class="dark:text-gray-100">${maxCur} ${maxCur > 7 ? '<i class="fas fa-fire text-orange-500 streak-fire"></i>' : ''}</strong></div>
+                <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Longest Ever:</span><strong class="dark:text-gray-100">${maxBest} <i class="fas fa-star text-yellow-400"></i></strong></div>
+                <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Avg Completion:</span><strong class="dark:text-gray-100">${avgRate}%</strong></div>
+                <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Days Completed:</span><strong class="dark:text-gray-100">${totalDone}</strong></div>
+                <div class="flex justify-between"><span class="text-gray-600 dark:text-gray-400">Days Tracked:</span><strong class="dark:text-gray-100">${totalTracked}</strong></div>`;
+        }
+        function renderDashboardChart() {
+             console.log("renderDashboardChart: Preparing chart data."); // DEBUG LOG
+             const user1Habits = state.habits?.user1 || []; // Safe navigation
+             const user2Habits = state.habits?.user2 || []; // Safe navigation
+             const shared = [];
+             // Use Set to get unique names, handling potential null/undefined habits
+             const names = new Set([...user1Habits.filter(h=>h?.name).map(h => h.name), ...user2Habits.filter(h=>h?.name).map(h => h.name)]);
+
+             names.forEach(name => {
+                 const h1 = user1Habits.find(h => h?.name === name);
+                 const h2 = user2Habits.find(h => h?.name === name);
+                 const s1 = h1 ? calculateStreak(h1.chain) : 0;
+                 const s2 = h2 ? calculateStreak(h2.chain) : 0;
+                 if (s1 > 0 || s2 > 0) shared.push({ name, s1, s2 });
+            });
+             console.log("renderDashboardChart: Shared habits with streaks > 0:", shared.length); // DEBUG LOG
+
+             const canvas = getEl('streakComparisonChart'); const msg = getEl('no-comparison-data'); const ctx = canvas?.getContext('2d'); // Safe navigation
+             if (!canvas || !msg || !ctx) {
+                 console.error("renderDashboardChart: Canvas elements not found."); return;
+             }
+
+             if (comparisonChart) { comparisonChart.destroy(); comparisonChart = null; }
+
+             msg.classList.toggle('hidden', shared.length > 0);
+             canvas.classList.toggle('hidden', shared.length === 0);
+             getEl('comparison-chart-container').classList.toggle('hidden', shared.length === 0); // Toggle container visibility
+
+             if (shared.length === 0) return;
+
+             comparisonChart = new Chart(ctx, {
+                 type: 'bar',
+                 data: {
+                     labels: shared.map(h => h.name),
+                     datasets: [
+                         { label: state.userNames?.user1 || 'User 1', data: shared.map(h => h.s1), backgroundColor: 'rgba(99, 102, 241, 0.7)', borderColor: 'rgba(99, 102, 241, 1)', borderWidth: 1 }, // Safe name access
+                         { label: state.userNames?.user2 || 'User 2', data: shared.map(h => h.s2), backgroundColor: 'rgba(34, 197, 94, 0.7)', borderColor: 'rgba(34, 197, 94, 1)', borderWidth: 1 }  // Safe name access
+                    ]
+                 },
+                 options: {
+                     responsive: true, maintainAspectRatio: false,
+                     scales: {
+                         y: { beginAtZero: true, title: { display: true, text: 'Current Streak (Days)' }, grid: { color: state.theme === 'dark' ? '#30363d' : 'rgba(0,0,0,0.1)' }, ticks: { color: state.theme === 'dark' ? '#bdc6cf' : '#374151' } },
+                         x: { grid: { display: false }, ticks: { color: state.theme === 'dark' ? '#bdc6cf' : '#374151' } }
+                     },
+                     plugins: { legend: { labels: { color: state.theme === 'dark' ? '#bdc6cf' : '#374151' } }, tooltip: { mode: 'index', intersect: false } }
+                 }
+             });
+             console.log("renderDashboardChart: Chart rendered."); // DEBUG LOG
+         }
+        function renderDashboard() {
+            console.log("renderDashboard: Rendering dashboard view."); // DEBUG LOG
+            updateAvatarDisplays(); // Ensure avatars are up-to-date
+            renderDashboardStats('user1');
+            renderDashboardStats('user2');
+            renderDashboardChart();
+        }
+
+        // --- Modal Functions ---
+        function openModal(el) { if(el) el.classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
+        function closeModal(el) { if(el) el.classList.add('hidden'); document.body.style.overflow = ''; }
+
+        function openEditHabitsModal() {
+             console.log("openEditHabitsModal: Opening modal."); // DEBUG LOG
+             const list = getEl('edit-habits-list');
+             const userSelect = getEl('edit-habits-user-select');
+             if (!list || !userSelect) return;
+
+             list.innerHTML = '';
+             const user = userSelect.value;
+             const habits = state.habits?.[user] || []; // Safe navigation
+
+             console.log("openEditHabitsModal: Editing habits for", user, "Count:", habits.length); // DEBUG LOG
+
+             if (habits.length === 0) {
+                 list.innerHTML = `<p class="text-center text-gray-500 dark:text-gray-400 py-4">No habits found for ${state.userNames?.[user] || user}.</p>`; // Safe name access
+             } else {
+                 habits
+                    .filter(h => h) // Ensure habit exists
+                    .sort((a, b) => (a.name || '').localeCompare(b.name || '')) // Safe name access
+                    .forEach(h => {
+                        const s = calculateStreak(h.chain); const b = h.bestStreak || 0;
+                        const cN = stringToColorClass(h.category || 'General'); const cV = `--color-${cN}-500`;
+                        const btn = document.createElement('button');
+                        btn.className = `w-full text-left bg-gray-50 dark:bg-gray-800 p-3 rounded-lg shadow-sm cursor-pointer border-l-4 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-1 focus:ring-offset-1 ring-offset-white dark:ring-offset-gray-900 focus:ring-${cN}-500`;
+                        btn.style.borderLeftColor = `var(${cV}, #6b7280)`;
+                        btn.dataset.habitId = h.id;
+                        btn.innerHTML = `<div class="flex justify-between items-center"><div><h4 class="font-medium text-gray-800 dark:text-gray-100">${h.name || 'Unnamed'}</h4><span class="text-xs text-gray-500 dark:text-gray-400">${h.category || 'General'}</span></div><span class="text-xs font-mono text-gray-600 dark:text-gray-300">Curr:${s}/Best:${b}</span></div>`;
+                        btn.onclick = () => {
+                            console.log("openEditHabitsModal: Edit button clicked for habit", h.id); // DEBUG LOG
+                            openEditHabitModal(h.id, user);
+                            closeModal(getEl('edit-habits-modal'));
+                        };
+                        list.appendChild(btn);
+                 });
+             }
+             openModal(getEl('edit-habits-modal'));
+        }
+        function openEditHabitModal(habitId, user) {
+             console.log("openEditHabitModal: Opening modal for habit", habitId, "user", user); // DEBUG LOG
+             const userKey = user || state.currentUser;
+             // Find index safely
+             const idx = state.habits?.[userKey]?.findIndex(h => h?.id === habitId); // Safe navigation
+
+             if (idx === undefined || idx === -1) {
+                 console.error("openEditHabitModal: Habit not found.", habitId, userKey); // DEBUG LOG
+                 showNotification("Habit not found.", 'error');
+                 return;
+             }
+
+             const h = state.habits[userKey][idx];
+             const modal = getEl('edit-habit-modal');
+             if (!modal) return;
+
+             getEl('edit-habit-name').value = h.name || '';
+             getEl('edit-habit-category').value = h.category || '';
+             modal.dataset.habitId = h.id;
+             modal.dataset.habitUser = userKey;
+
+             const chain = h.chain || []; let note = ''; let noteDate = '';
+             // Simplified: Note editor modifies the note associated with today if the last chain entry was today.
+             const dateStr = getTodayDateString();
+             const noteKey = `${userKey}-${h.id}-${dateStr}`;
+             note = state.notes?.[noteKey] || ''; // Safe navigation
+             noteDate = dateStr;
+             modal.dataset.noteDate = noteDate; // Store the date the note applies to (always today for editor)
+             getEl('edit-habit-note').value = note;
+
+             renderEditChainContainer(chain);
+             openModal(modal);
+        }
+        function renderEditChainContainer(chain) {
+             console.log("renderEditChainContainer: Rendering chain length:", chain?.length || 0); // DEBUG LOG
+             const cont = getEl('edit-chain-container');
+             if (!cont) return;
+             cont.innerHTML = '';
+             if (!Array.isArray(chain)) {
+                 cont.dataset.currentChain = JSON.stringify([]); // Set empty array if invalid
+                 return;
+             }
+
+             chain.forEach((day, idx) => {
+                 const btn = document.createElement('button');
+                 btn.className = `w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium transition ${day ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-gray-300 dark:bg-gray-700 hover:bg-gray-400 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300'}`;
+                 btn.textContent = idx + 1;
+                 btn.type = 'button';
+                 btn.title = `Day ${idx + 1}`;
+                 btn.dataset.index = idx;
+                 btn.onclick = () => {
+                     const currentChainData = cont.dataset.currentChain;
+                     try {
+                        const current = JSON.parse(currentChainData || '[]');
+                         if (idx < current.length) { // Ensure index is valid
+                             current[idx] = !current[idx];
+                             cont.dataset.currentChain = JSON.stringify(current);
+                             renderEditChainContainer(current); // Re-render to reflect change
+                         } else {
+                            console.error("renderEditChainContainer: Clicked index out of bounds:", idx);
+                         }
+                     } catch (e) {
+                         console.error("renderEditChainContainer: Error parsing or updating chain data:", e); // DEBUG LOG
+                         cont.dataset.currentChain = JSON.stringify(chain); // Reset to original if error
+                     }
+                 };
+                 cont.appendChild(btn);
+             });
+             cont.dataset.currentChain = JSON.stringify(chain); // Store the current state as JSON string
+        }
+
+        // --- Notifications --- (Unchanged)
+        function showNotification(message, type = 'info', duration = 3000) {
+             const area = getEl('notification-area'); if (!area) return; const notif = document.createElement('div');
+             const typeClasses = { success: 'bg-green-500 border-green-600', error: 'bg-red-500 border-red-600', info: 'bg-blue-500 border-blue-600', warning: 'bg-yellow-500 border-yellow-600 text-black' };
+             notif.className = `rounded-lg shadow-lg p-3 border-l-4 text-white text-sm ${typeClasses[type] || typeClasses.info} transition-all duration-300 ease-out transform translate-y-2 opacity-0`;
+             notif.textContent = message; area.appendChild(notif);
+             requestAnimationFrame(() => { notif.style.opacity = '1'; notif.style.transform = 'translateY(0)'; });
+             const tId = setTimeout(() => { notif.style.opacity = '0'; notif.style.transform = 'translateX(100%)'; setTimeout(() => notif.remove(), 300); }, duration);
+             notif.onclick = () => { clearTimeout(tId); notif.style.opacity = '0'; notif.style.transform = 'translateX(100%)'; setTimeout(() => notif.remove(), 300); };
+        }
+
+        // --- Undo Functionality ---
+        function showUndo(userId, habitId) {
+             console.log("showUndo: Displaying undo for user", userId, "habit", habitId); // DEBUG LOG
+             clearPendingUndo(); // Clear any previous one
+             const card = queryEl(`.habit-card[data-habit-id='${habitId}'][data-user-id='${userId}']`);
+             if (!card) { console.warn("showUndo: Card not found for undo."); return; } // DEBUG LOG
+             const btn = card.querySelector('.undo-button');
+             if (!btn) { console.warn("showUndo: Undo button not found in card."); return; } // DEBUG LOG
+
+             state.pendingUndo = { userId, habitId };
+             btn.classList.add('visible');
+             // Clear undo after a timeout
+             undoTimeoutId = setTimeout(clearPendingUndo, 5000);
+        }
+        function handleUndoClick(event) {
+             event?.stopPropagation();
+             if (!state.pendingUndo) { console.log("handleUndoClick: No pending undo."); return; } // DEBUG LOG
+
+             const { userId, habitId } = state.pendingUndo;
+             console.log("handleUndoClick: Undoing action for user", userId, "habit", habitId); // DEBUG LOG
+
+             // Find index safely
+             const idx = state.habits?.[userId]?.findIndex(h => h?.id === habitId); // Safe navigation
+
+             if (idx !== undefined && idx !== -1) {
+                 const h = state.habits[userId][idx];
+                 if (Array.isArray(h.chain) && h.chain.length > 0) {
+                     h.chain.pop(); // Remove the last entry (assumes it was 'true')
+                     const today = getTodayDateString();
+                     const key = `${userId}-${habitId}`;
+                     // Only remove lastTrackedDate if it was for today
+                     if (state.lastTrackedDate?.[key] === today) { // Safe navigation
+                         delete state.lastTrackedDate[key];
+                     }
+                      // Remove today's note if it exists
+                     const noteKey = `${userId}-${habitId}-${today}`;
+                     if (state.notes?.[noteKey]) {
+                         delete state.notes[noteKey];
+                         console.log("handleUndoClick: Removed note for", noteKey);
+                     }
+
+                     calculateAndUpdateBestStreak(h); // Recalculate best streak
+                     console.log("handleUndoClick: Calling saveSharedStateToFirebase"); // DEBUG LOG
+                     saveSharedStateToFirebase(); // Save the modified state
+                     renderHabits(); // Update UI immediately
+                     showNotification('Last tracking action undone.', 'info');
+                 } else {
+                     console.warn("handleUndoClick: Habit chain is empty or invalid, cannot undo."); // DEBUG LOG
+                 }
+             } else {
+                  console.warn("handleUndoClick: Habit not found for undo:", habitId, userId); // DEBUG LOG
+             }
+             clearPendingUndo(); // Clear the undo state
+        }
+        function clearPendingUndo() {
+             if (undoTimeoutId) { clearTimeout(undoTimeoutId); undoTimeoutId = null; }
+             if (state.pendingUndo) {
+                 const { userId, habitId } = state.pendingUndo;
+                 const card = queryEl(`.habit-card[data-habit-id='${habitId}'][data-user-id='${userId}']`);
+                 if (card) {
+                     const btn = card.querySelector('.undo-button');
+                     if (btn) btn.classList.remove('visible');
+                 }
+                 console.log("clearPendingUndo: Cleared undo state for user", userId, "habit", habitId); // DEBUG LOG
+                 state.pendingUndo = null;
+             }
+         }
+
+        // --- Initialization ---
+        function initApp() {
+            console.log("initApp: Initializing application UI."); // DEBUG LOG
+            // loadLocalState() was already called before Firebase load
+            applyTheme(); // Apply theme based on potentially loaded state
+            displayQuote();
+            // Update displays based on loaded state *before* rendering the main view
+            updateUserDisplayNames();
+            updateAvatarDisplays();
+            updateCategoriesFromHabits(); // Ensure categories are ready based on loaded state
+            populateCategoryFilterAndSuggestions();
+
+            // Render the view based on last known local state or default
+            console.log("initApp: Calling updateViewSpecificStyles"); // DEBUG LOG
+            updateViewSpecificStyles(); // This calls renderCurrentView
+
+            showNotification(`Welcome back! Data synced.`, 'success', 2000);
+        }
+
+        // --- Event Handlers Setup --- (Unchanged structure)
+        function setupEventListeners() {
+            console.log("setupEventListeners: Setting up event listeners."); // DEBUG LOG
+            // Login & Header
+            const loginBtn = getEl('login-btn');
+            if (loginBtn) loginBtn.addEventListener('click', handleLogin);
+
+            const pinInput = getEl('pin-input');
+            if (pinInput) {
+              pinInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleLogin(); });
+              pinInput.addEventListener('input', () => { if (pinInput.value.length > 4) pinInput.value = pinInput.value.slice(0, 4); });
+            }
+
+            const logoutBtn = getEl('logout-btn');
+            if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
+
+            const themeToggle = getEl('theme-toggle');
+            if (themeToggle) themeToggle.addEventListener('click', toggleTheme);
+
+            const settingsBtn = getEl('settings-btn');
+            if (settingsBtn) settingsBtn.addEventListener('click', () => getEl('settings-panel').classList.add('open'));
+
+            // View Navigation
+            const u1 = getEl('user1-btn');
+            if (u1) u1.addEventListener('click', () => switchUserView('user1'));
+
+            const u2 = getEl('user2-btn');
+            if (u2) u2.addEventListener('click', () => switchUserView('user2'));
+
+            const cmp = getEl('compare-btn');
+            if (cmp) cmp.addEventListener('click', showCompareView);
+
+            const addBtn = getEl('add-habit-btn');
+            if (addBtn) addBtn.addEventListener('click', () => getEl('add-habit-form').classList.remove('hidden'));
+
+            const cancelBtn = getEl('cancel-habit-btn');
+            if (cancelBtn) cancelBtn.addEventListener('click', () => { getEl('add-habit-form').classList.add('hidden'); getEl('new-habit-name').value = ''; getEl('new-habit-category').value = ''; });
+
+            const saveBtn = getEl('save-habit-btn');
+            if (saveBtn) saveBtn.addEventListener('click', handleSaveNewHabit);
+
+            const newHabitName = getEl('new-habit-name');
+            if (newHabitName) newHabitName.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleSaveNewHabit(); });
+
+            const catFilter = getEl('category-filter');
+            if (catFilter) catFilter.addEventListener('change', renderHabits);
+
+            const habitsContainer = getEl('habits-container');
+            if (habitsContainer) habitsContainer.addEventListener('click', handleHabitCardClick);
+
+            const closeSettings = getEl('close-settings-btn');
+            if (closeSettings) closeSettings.addEventListener('click', () => getEl('settings-panel').classList.remove('open'));
+
+            const darkToggle = getEl('dark-mode-toggle');
+            if (darkToggle) darkToggle.addEventListener('click', toggleTheme);
+
+            const u1AvatarBtn = getEl('user1-avatar-btn');
+            if (u1AvatarBtn) u1AvatarBtn.addEventListener('click', () => getEl('user1-avatar').click());
+
+            const u2AvatarBtn = getEl('user2-avatar-btn');
+            if (u2AvatarBtn) u2AvatarBtn.addEventListener('click', () => getEl('user2-avatar').click());
+
+            const u1Avatar = getEl('user1-avatar');
+            if (u1Avatar) u1Avatar.addEventListener('change', (e) => handleAvatarUpload(e, 'user1'));
+
+            const u2Avatar = getEl('user2-avatar');
+            if (u2Avatar) u2Avatar.addEventListener('change', (e) => handleAvatarUpload(e, 'user2'));
+
+            const saveNames = getEl('save-names-btn');
+            if (saveNames) saveNames.addEventListener('click', handleSaveUserProfiles);
+
+            const editHabitsBtn = getEl('edit-habits-btn');
+            if (editHabitsBtn) editHabitsBtn.addEventListener('click', () => { getEl('settings-panel').classList.remove('open'); getEl('edit-habits-user-select').value = state.currentUser; openEditHabitsModal(); });
+
+            const resetAllBtn = getEl('reset-all-btn');
+            if (resetAllBtn) resetAllBtn.addEventListener('click', () => { getEl('settings-panel').classList.remove('open'); openModal(getEl('reset-confirm-modal')); });
+
+            const editUserSelect = getEl('edit-habits-user-select');
+            if (editUserSelect) editUserSelect.addEventListener('change', openEditHabitsModal);
+
+            const cancelEditHabitsBtn = getEl('cancel-edit-habits-btn');
+            if (cancelEditHabitsBtn) cancelEditHabitsBtn.addEventListener('click', () => closeModal(getEl('edit-habits-modal')));
+
+            const saveEditHabitBtn = getEl('save-edit-habit-btn');
+            if (saveEditHabitBtn) saveEditHabitBtn.addEventListener('click', handleSaveEditedHabit);
+
+            const resetHabitBtn = getEl('reset-habit-btn');
+            if (resetHabitBtn) resetHabitBtn.addEventListener('click', handleResetSingleHabit);
+
+            const deleteHabitBtn = getEl('delete-habit-btn');
+            if (deleteHabitBtn) deleteHabitBtn.addEventListener('click', handleDeleteHabit);
+
+            const cancelEditHabitBtn = getEl('cancel-edit-habit-btn');
+            if (cancelEditHabitBtn) cancelEditHabitBtn.addEventListener('click', () => closeModal(getEl('edit-habit-modal')));
+
+            const confirmResetBtn = getEl('confirm-reset-btn');
+            if (confirmResetBtn) confirmResetBtn.addEventListener('click', handleConfirmResetAll);
+
+            const cancelResetBtn = getEl('cancel-reset-btn');
+            if (cancelResetBtn) cancelResetBtn.addEventListener('click', () => closeModal(getEl('reset-confirm-modal')));
+
+            const confirmDeleteBtn = getEl('confirm-delete-btn');
+            if (confirmDeleteBtn) confirmDeleteBtn.addEventListener('click', handleConfirmDeleteHabit);
+
+            const cancelDeleteBtn = getEl('cancel-delete-btn');
+            if (cancelDeleteBtn) cancelDeleteBtn.addEventListener('click', () => closeModal(getEl('delete-confirm-modal')));
+
+            const confirmResetPinBtn = getEl('confirm-reset-pin-btn');
+            if (confirmResetPinBtn) confirmResetPinBtn.addEventListener('click', handleConfirmResetPin);
+
+            const cancelResetPinBtn = getEl('cancel-reset-pin-btn');
+            if (cancelResetPinBtn) cancelResetPinBtn.addEventListener('click', () => closeModal(getEl('reset-pin-modal')));
+            [getEl('current-pin'), getEl('new-pin'), getEl('confirm-new-pin')].forEach(input => { input?.addEventListener('input', () => { if (input.value.length > 4) input.value = input.value.slice(0, 4); }); input?.addEventListener('keypress', (e) => { if (!/\d/.test(e.key) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) e.preventDefault(); }); }); // Added safe navigation
+
+            setupModalAndSettingsClosers(); // Generic closers
+             console.log("setupEventListeners: All listeners attached."); // DEBUG LOG
+        }
+
+        function setupModalAndSettingsClosers() {
+             queryAllEl('.modal-overlay').forEach(modal => { modal.addEventListener('click', (e) => { if (e.target === modal) { const cb = modal.querySelector('[id^="cancel-"]'); if (cb) cb.click(); else closeModal(modal); } }); });
+             document.addEventListener('click', (e) => { const p = getEl('settings-panel'), b = getEl('settings-btn'); if (!p || !b) return; if (p.classList.contains('open') && !p.contains(e.target) && !b.contains(e.target)) p.classList.remove('open'); });
+             console.log("setupModalAndSettingsClosers: Generic modal/settings closers attached."); // DEBUG LOG
+        }
+
+        // --- Event Handlers (Modified to trigger saves) ---
+        function handleLogin() {
+            console.log("handleLogin: Attempting login."); // DEBUG LOG
+            // Ensure Firebase is initialized before proceeding
+            if (!firebaseApp || !db || !dbRef) {
+                console.error("handleLogin: Firebase not initialized, cannot proceed.");
+                showNotification("Initialization error. Cannot login.", "error");
+                getEl('pin-error').textContent = "App Error: Cannot connect.";
+                getEl('pin-error').classList.remove('hidden');
+                return;
+            }
+
+            const pinInput = getEl('pin-input').value;
+            if (pinInput === state.appPin) {
+                getEl('pin-error').classList.add('hidden');
+                // Load shared state *after* PIN is verified
+                loadSharedStateFromFirebase().then(() => {
+                    // Only proceed if Firebase load was successful
+                    console.log("handleLogin: Firebase load successful, proceeding to show app."); // DEBUG LOG
+                    anime({ targets: getEl('login-container'), scale: 0.9, opacity: 0, duration: 300, easing: 'easeInOutQuad',
+                        complete: () => { getEl('login-screen').classList.add('opacity-0', 'pointer-events-none'); setTimeout(() => { getEl('login-screen').classList.add('hidden'); getEl('app-container').classList.remove('hidden'); initApp(); }, 300); } });
+                }).catch(err => {
+                    console.error("handleLogin: Firebase load failed.", err); // DEBUG LOG
+                    showNotification("Failed to load cloud data. Check connection.", "error");
+                    getEl('pin-error').textContent = "Login failed: Could not load data.";
+                    getEl('pin-error').classList.remove('hidden');
+                });
+
+            } else {
+                console.log("handleLogin: Incorrect PIN entered."); // DEBUG LOG
+                getEl('pin-error').textContent = "Incorrect PIN. Try again."; // More specific error
+                getEl('pin-error').classList.remove('hidden');
+                anime({ targets: getEl('login-container'), translateX: [{ value: -6 }, { value: 6 }, { value: -4 }, { value: 4 }, { value: 0 }], duration: 300, easing: 'easeInOutSine' });
+            }
+        }
+        function handleLogout() {
+            console.log("handleLogout: Logging out."); // DEBUG LOG
+            if (!confirm("Log out? This will clear the connection.")) return;
+            // Detach Firebase listener on logout
+            if (dataListener && dataListener.ref && dataListener.callback) {
+                dataListener.ref.off('value', dataListener.callback);
+                dataListener = null;
+                console.log("Detached Firebase listener on logout."); // DEBUG LOG
+            }
+            // Reset local state parts potentially? Or just show login
+            getEl('app-container').classList.add('hidden');
+            getEl('login-screen').classList.remove('hidden', 'opacity-0', 'pointer-events-none');
+            getEl('pin-input').value = '';
+            getEl('pin-error').classList.add('hidden');
+            anime({ targets: getEl('login-container'), scale: [0.95, 1], opacity: [0, 1], duration: 300, easing: 'easeOutQuad' });
+        }
+        function toggleTheme() {
+             state.theme = (state.theme === 'light') ? 'dark' : 'light';
+             console.log("toggleTheme: Toggling theme to", state.theme); // DEBUG LOG
+             applyTheme();
+             saveLocalState(); // Theme is local
+        }
+        function switchUserView(userId) {
+            console.log("switchUserView: Switching to user", userId); // DEBUG LOG
+            clearPendingUndo();
+            if (state.currentUser === userId && state.currentView === 'user') {
+                console.log("switchUserView: Already viewing this user. No change needed."); // Prevent unnecessary re-renders
+                return;
+            }
+
+            state.currentUser = userId; // Set the new user *before* updating displays
+            state.currentView = 'user';
+
+            // --- Explicitly update header elements based on the NEW currentUser ---
+            console.log("switchUserView: Explicitly updating avatar, name displays for", userId);
+            updateAvatarDisplays();      // Updates all avatars, including the header one
+            updateUserDisplayNames();  // Updates all names, including the header one
+
+            // Now update styles and render the view, which will call renderHabits -> updateOverallStreakDisplay
+            updateViewSpecificStyles();
+        }
+        function showCompareView() {
+            console.log("showCompareView: Switching to compare view."); // DEBUG LOG
+            clearPendingUndo();
+            state.currentView = 'compare';
+            updateViewSpecificStyles(); // This saves local state and renders
+        }
+
+        function handleSaveNewHabit() {
+            console.log("handleSaveNewHabit: Fired!"); // DEBUG LOG
+            const nameInput = getEl('new-habit-name'); const catInput = getEl('new-habit-category');
+            const name = nameInput.value.trim(); let cat = catInput.value.trim() || 'General';
+
+            if (!name) { showNotification("Habit name required.", 'warning'); return; }
+
+            // Ensure user's habit array exists
+            if (!state.habits[state.currentUser]) {
+                state.habits[state.currentUser] = [];
+                console.log("handleSaveNewHabit: Initialized habit array for user", state.currentUser); // DEBUG LOG
+            }
+
+            const habits = state.habits[state.currentUser];
+            if (habits.some(h => h && h.name.toLowerCase() === name.toLowerCase())) { // Add check for h existence
+                showNotification(`Habit "${name}" already exists.`, 'warning');
+                return;
+            }
+
+            const newHabit = { id: Date.now(), name, chain: [], category: cat, bestStreak: 0 };
+            console.log("handleSaveNewHabit: Adding new habit:", newHabit); // DEBUG LOG
+            state.habits[state.currentUser].push(newHabit); // Add to local state
+
+            updateCategoriesFromHabits();
+            populateCategoryFilterAndSuggestions();
+            console.log("handleSaveNewHabit: Calling saveSharedStateToFirebase"); // DEBUG LOG
+            saveSharedStateToFirebase(); // <-- Save the updated state
+            renderHabits(); // Update UI immediately
+            nameInput.value = ''; catInput.value = ''; getEl('add-habit-form').classList.add('hidden');
+            showNotification(`Habit "${name}" added!`, 'success');
+
+            // Scroll and highlight animation (keep try-catch)
+            try {
+                const card = queryEl(`.habit-card[data-habit-id="${newHabit.id}"]`);
+                if (card) {
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    anime({ targets: card, backgroundColor: state.theme === 'dark' ? ['#1f2937', '#161b22'] : ['#ecfdf5', '#ffffff'], duration: 1500 });
+                 }
+            } catch(e) { console.warn("handleSaveNewHabit: Animation failed.", e); }
+        }
+        function handleHabitCardClick(event) {
+            const trackBtn = event.target.closest('.track-btn');
+            const undoBtn = event.target.closest('.undo-button');
+
+            if (undoBtn && state.pendingUndo && parseInt(undoBtn.dataset.habitId) === state.pendingUndo.habitId) {
+                console.log("handleHabitCardClick: Undo button clicked."); // DEBUG LOG
+                handleUndoClick(event); // handleUndoClick now saves
+                return;
+            }
+            if (trackBtn && !trackBtn.disabled) {
+                console.log("handleHabitCardClick: Track button clicked for habit", trackBtn.dataset.habitId); // DEBUG LOG
+                clearPendingUndo();
+                const habitId = parseInt(trackBtn.dataset.habitId);
+                const userId = state.currentUser;
+                // Find index safely
+                const idx = state.habits?.[userId]?.findIndex(h => h?.id === habitId); // Safe navigation
+
+                if (idx === undefined || idx === -1) {
+                    console.error("handleHabitCardClick: Habit not found for tracking:", habitId, userId); // DEBUG LOG
+                    return;
+                }
+                if (hasTrackedToday(userId, habitId)) {
+                    console.log("handleHabitCardClick: Already tracked today."); // DEBUG LOG
+                    return;
+                }
+
+                const h = state.habits[userId][idx];
+                if (!Array.isArray(h.chain)) h.chain = []; // Ensure chain is an array
+
+                const oldStreak = calculateStreak(h.chain);
+                h.chain.push(true);
+                const newStreak = oldStreak + 1;
+                h.bestStreak = Math.max(h.bestStreak || 0, newStreak);
+
+                // Ensure lastTrackedDate object exists
+                if (!state.lastTrackedDate) state.lastTrackedDate = {};
+                state.lastTrackedDate[`${userId}-${habitId}`] = getTodayDateString();
+
+                console.log("handleHabitCardClick: Calling saveSharedStateToFirebase"); // DEBUG LOG
+                saveSharedStateToFirebase(); // <-- Save the updated state
+                showUndo(userId, habitId); // Show undo locally
+                renderHabits(); // Update UI immediately
+
+                // Confetti animation - CENTERED
+                try {
+                    if (typeof confetti === 'function') {
+                        // const r = trackBtn.getBoundingClientRect(); // No longer need button rect
+                        confetti({
+                            particleCount: 100, // More particles for center effect
+                            spread: 70,        // Wider spread
+                            origin: { x: 0.5, y: 0.5 }, // Center of the screen
+                            zIndex: 100 // Ensure it's above other elements
+                        });
+                     }
+                } catch(e) { console.warn("handleHabitCardClick: Confetti failed.", e); }
+            }
+        }
+        function handleAvatarUpload(event, userKey) {
+            console.log("handleAvatarUpload: File selected for", userKey); // DEBUG LOG
+            const file = event.target.files[0];
+            const preview = getEl(userKey === 'user1' ? 'settings-user1-avatar-preview' : 'settings-user2-avatar-preview');
+            if (!preview) return;
+
+            if (file && file.type.startsWith('image/')) {
+                if (file.size > 2097152) { // 2MB limit
+                     showNotification("Max 2MB image size.", 'warning');
+                     event.target.value = ''; return;
+                 }
+                 const reader = new FileReader();
+                 reader.onload = (e) => {
+                     console.log("handleAvatarUpload: Image loaded for", userKey); // DEBUG LOG
+                     // Ensure userAvatars object exists
+                     if (!state.userAvatars) state.userAvatars = { user1: '', user2: '' };
+                     state.userAvatars[userKey] = e.target.result;
+                     preview.src = e.target.result;
+                     // Don't save here, wait for Save Profiles button
+                 };
+                 reader.onerror = () => {
+                    console.error("handleAvatarUpload: Error reading image file."); // DEBUG LOG
+                    showNotification("Error reading image.", 'error');
+                 };
+                 reader.readAsDataURL(file);
+            } else if (file) {
+                 console.log("handleAvatarUpload: Invalid file type selected."); // DEBUG LOG
+                 showNotification("Invalid image file.", 'warning');
+                 event.target.value = ''; // Clear the input
+            }
+        }
+        function handleSaveUserProfiles() {
+            console.log("handleSaveUserProfiles: Fired!"); // DEBUG LOG
+            // Ensure userNames object exists
+            if (!state.userNames) state.userNames = { user1: 'User 1', user2: 'User 2' };
+            state.userNames.user1 = getEl('user1-name').value.trim() || 'User 1';
+            state.userNames.user2 = getEl('user2-name').value.trim() || 'User 2';
+            // Avatars should already be updated in state by handleAvatarUpload
+
+            console.log("handleSaveUserProfiles: Calling saveSharedStateToFirebase"); // DEBUG LOG
+            saveSharedStateToFirebase(); // <-- Save the updated state
+            updateUserDisplayNames(); // Update UI
+            updateAvatarDisplays();   // Update UI
+            // Re-render current view to reflect potential name changes in dashboard/habit list
+            renderCurrentView();
+            showNotification('Profiles saved!', 'success');
+            getEl('settings-panel').classList.remove('open');
+        }
+        function handleSaveEditedHabit() {
+             console.log("handleSaveEditedHabit: Fired!"); // DEBUG LOG
+             const modal = getEl('edit-habit-modal');
+             if (!modal || !modal.dataset.habitId || !modal.dataset.habitUser) {
+                 console.error("handleSaveEditedHabit: Modal data missing."); return;
+             }
+             const id = parseInt(modal.dataset.habitId); const user = modal.dataset.habitUser;
+             // Find index safely
+             const idx = state.habits?.[user]?.findIndex(h => h?.id === id); // Safe navigation
+
+             if (idx === undefined || idx === -1) {
+                 console.error("handleSaveEditedHabit: Habit not found for saving:", id, user); // DEBUG LOG
+                 showNotification("Error saving.", 'error');
+                 closeModal(modal); return;
+             }
+
+             const name = getEl('edit-habit-name').value.trim(); let cat = getEl('edit-habit-category').value.trim() || 'General';
+             const chainContainer = getEl('edit-chain-container');
+             let chain = [];
+             try {
+                 chain = JSON.parse(chainContainer?.dataset?.currentChain || '[]'); // Safe navigation & parsing
+             } catch (e) {
+                 console.error("handleSaveEditedHabit: Failed to parse chain data from modal:", e); // DEBUG LOG
+                 showNotification("Error saving chain data.", 'error');
+                 return; // Don't save if chain data is corrupted
+             }
+
+             const note = getEl('edit-habit-note').value.trim();
+             const noteDate = modal.dataset.noteDate; // Date note *editor* referred to (today)
+
+             if (!name) { showNotification("Name required.", 'warning'); return; }
+
+             // Check for duplicate name (excluding the current habit)
+             if (state.habits[user].some(h => h && h.id !== id && h.name.toLowerCase() === name.toLowerCase())) { // Add check for h existence
+                 showNotification(`"${name}" already exists for this user.`, 'warning');
+                 return;
+             }
+
+             const h = state.habits[user][idx];
+             h.name = name; h.category = cat; h.chain = chain;
+             calculateAndUpdateBestStreak(h); // Recalculate best streak
+
+             // Update Note: Associate with today's date IF the last day in the *edited* chain is TRUE.
+             if (!state.notes) state.notes = {};
+             const noteKeyBase = `${user}-${id}-`;
+             const todayKey = `${noteKeyBase}${getTodayDateString()}`;
+
+             // Decide whether to save/update or delete today's note based on chain and note input
+             if (chain[chain.length - 1] && note) { // If last day is true AND note has content
+                 state.notes[todayKey] = note;
+                 console.log("handleSaveEditedHabit: Saving/Updating note for today:", todayKey);
+             } else { // If last day is false OR note is empty
+                 if(state.notes[todayKey]) {
+                    delete state.notes[todayKey];
+                    console.log("handleSaveEditedHabit: Removing note for today (chain end false or note empty):", todayKey);
+                 }
+             }
+
+             updateCategoriesFromHabits();
+             populateCategoryFilterAndSuggestions();
+             console.log("handleSaveEditedHabit: Calling saveSharedStateToFirebase"); // DEBUG LOG
+             saveSharedStateToFirebase(); // <-- Save the updated state
+             closeModal(modal);
+             renderCurrentView(); // Update UI
+             showNotification(`"${name}" updated.`, 'success');
+        }
+        function handleResetSingleHabit() {
+            console.log("handleResetSingleHabit: Resetting chain in editor."); // DEBUG LOG
+            if (!confirm("Reset chain for this habit? Changes apply only after saving.")) return;
+            const modal = getEl('edit-habit-modal');
+            const chain = [];
+            renderEditChainContainer(chain); // Update editor UI
+            // Update the dataset directly so save picks it up
+            const chainContainer = getEl('edit-chain-container');
+            if (chainContainer) chainContainer.dataset.currentChain = JSON.stringify(chain);
+            // Also clear the note field in the editor as the chain is empty
+            getEl('edit-habit-note').value = '';
+            showNotification('Chain reset in editor. Save changes to confirm.', 'info');
+        }
+        function handleDeleteHabit() {
+             console.log("handleDeleteHabit: Opening confirmation."); // DEBUG LOG
+             const modal = getEl('edit-habit-modal');
+             if (!modal || !modal.dataset.habitId || !modal.dataset.habitUser) {
+                 console.error("handleDeleteHabit: Modal data missing."); return;
+             }
+             const id = parseInt(modal.dataset.habitId); const user = modal.dataset.habitUser;
+             // Find index safely
+             const idx = state.habits?.[user]?.findIndex(h => h?.id === id); // Safe navigation
+
+             if (idx === undefined || idx === -1) {
+                 console.error("handleDeleteHabit: Habit not found for deletion:", id, user); // DEBUG LOG
+                 return;
+             }
+             getEl('delete-habit-name-confirm').textContent = state.habits[user][idx].name || 'Unnamed';
+             getEl('delete-habit-user-confirm').textContent = state.userNames?.[user] || user; // Safe navigation
+             getEl('delete-confirm-modal').dataset.habitId = id;
+             getEl('delete-confirm-modal').dataset.habitUser = user;
+             closeModal(modal);
+             openModal(getEl('delete-confirm-modal'));
+        }
+        function handleConfirmDeleteHabit() {
+            console.log("handleConfirmDeleteHabit: Fired!"); // DEBUG LOG
+            const modal = getEl('delete-confirm-modal');
+            if (!modal || !modal.dataset.habitId || !modal.dataset.habitUser) {
+                 console.error("handleConfirmDeleteHabit: Confirmation modal data missing."); return;
+             }
+            const id = parseInt(modal.dataset.habitId); const user = modal.dataset.habitUser;
+
+            // Ensure user habits array exists and filter
+            if (state.habits?.[user]) { // Safe navigation
+                console.log("handleConfirmDeleteHabit: Deleting habit", id, "for user", user); // DEBUG LOG
+                state.habits[user] = state.habits[user].filter(h => h?.id !== id); // Safe navigation in filter
+            }
+
+            // Also remove associated notes, ensure notes object exists
+            if (state.notes) {
+                Object.keys(state.notes).filter(k => k.startsWith(`${user}-${id}-`)).forEach(k => {
+                    console.log("handleConfirmDeleteHabit: Deleting note", k); // DEBUG LOG
+                    delete state.notes[k];
+                });
+            }
+            // Remove associated lastTrackedDate entry, ensure object exists
+            if (state.lastTrackedDate) {
+                const trackKey = `${user}-${id}`;
+                if (state.lastTrackedDate[trackKey]) {
+                    console.log("handleConfirmDeleteHabit: Deleting lastTrackedDate for", trackKey); // DEBUG LOG
+                    delete state.lastTrackedDate[trackKey];
+                }
+            }
+
+            updateCategoriesFromHabits();
+            populateCategoryFilterAndSuggestions();
+            console.log("handleConfirmDeleteHabit: Calling saveSharedStateToFirebase"); // DEBUG LOG
+            saveSharedStateToFirebase(); // <-- Save the updated state
+            closeModal(modal);
+            renderCurrentView(); // Update UI
+            showNotification("Habit deleted.", 'success');
+        }
+        function handleConfirmResetAll() {
+             console.log("handleConfirmResetAll: Fired!"); // DEBUG LOG
+             // Reset shared state parts
+             state.habits = { user1: [], user2: [] };
+             state.notes = {};
+             state.lastTrackedDate = {};
+             state.categories = ['General']; // Reset categories derived from habits
+
+             // Reset locally derived best streaks in UI (if applicable)
+             getEl('streak-days').textContent = '0';
+             getEl('streak-icon').classList.add('hidden');
+
+             console.log("handleConfirmResetAll: Calling saveSharedStateToFirebase"); // DEBUG LOG
+             saveSharedStateToFirebase(); // <-- Save the reset state
+             closeModal(getEl('reset-confirm-modal'));
+             // Update UI based on reset state
+             updateCategoriesFromHabits();
+             populateCategoryFilterAndSuggestions();
+             renderCurrentView();
+             showNotification("All shared data reset and synced.", 'success');
+        }
+        function handleConfirmResetPin() {
+            console.log("handleConfirmResetPin: Fired!"); // DEBUG LOG
+            const cur = getEl('current-pin').value; const n1 = getEl('new-pin').value; const n2 = getEl('confirm-new-pin').value; const err = getEl('reset-pin-error'); err.classList.add('hidden');
+            if (cur !== state.appPin) { err.textContent = 'Current PIN incorrect.'; err.classList.remove('hidden'); return; }
+            if (!/^\d{4}$/.test(n1)) { err.textContent = 'New PIN must be 4 digits.'; err.classList.remove('hidden'); return; }
+            if (n1 === cur) { err.textContent = 'New PIN must be different.'; err.classList.remove('hidden'); return; }
+            if (n1 !== n2) { err.textContent = 'New PINs do not match.'; err.classList.remove('hidden'); return; }
+            state.appPin = n1;
+            console.log("handleConfirmResetPin: Saving new local PIN."); // DEBUG LOG
+            saveLocalState(); // <-- Save the new local PIN
+            closeModal(getEl('reset-pin-modal'));
+            showNotification("Local PIN changed!", 'success');
+        }
+
+        // --- Run ---
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("DOMContentLoaded: Starting application setup."); // DEBUG LOG
+            try {
+                loadLocalState(); // Load theme/pin/lastView/lastUser first
+                applyTheme();     // Apply theme immediately based on local state
+                setupEventListeners();
+                // Show login screen, Firebase connection happens after PIN entry
+                getEl('login-screen').classList.remove('hidden');
+                anime({ targets: getEl('login-container'), scale: [0.95, 1], opacity: [0, 1], duration: 400, easing: 'easeOutExpo' });
+                console.log("DOMContentLoaded: Login screen displayed."); // DEBUG LOG
+            } catch (error) {
+                console.error("Initialization Error (DOMContentLoaded):", error); // KEEP THIS
+                 // Make error more visible if basic setup fails
+                 document.body.innerHTML = `<div style="padding: 20px; text-align: center; color: red; font-family: sans-serif;">App failed during initial setup (DOMContentLoaded). Check console (F12) for errors. Error: ${error.message}</div>`;
+
+            }
+        });
+
+    </script>
+<script src="auth.js"></script>
+<script src="pairing.js"></script>
+<!-- <script src="messaging.js"></script> -->
+<script src="analytics.js"></script>
+<script src="achievements.js"></script>
+<script src="share.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js')
+      .then(reg => console.log('Service Worker registered:', reg.scope))
+      .catch(err => console.error('Service Worker registration failed:', err));
+  });
+}
+</script>
+</body>
+</html>
