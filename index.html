@@ -790,12 +790,15 @@
              return new Promise((resolve, reject) => {
                  pairRef.get().then((snapshot) => {
                     console.log("Firebase snapshot received. Exists:", snapshot.exists()); // DEBUG LOG
-                     if (snapshot.exists()) {
-                         const remotePairData = snapshot.val();
-                         console.log("Firebase pair data raw:", remotePairData ? JSON.stringify(remotePairData).substring(0, 300) + "..." : "null"); // DEBUG LOG (Truncated)
+if (snapshot.exists()) {
+    const remotePairData = snapshot.val();
+    console.log("Firebase pair data raw:", remotePairData ? JSON.stringify(remotePairData).substring(0, 300) + "..." : "null"); // DEBUG LOG (Truncated)
 
-                         // Construct the shared state parts from the pair data
-                         const mergedState = {
+    // Set user2Active flag
+    window.user2Active = !!remotePairData.user2;
+
+    // Construct the shared state parts from the pair data
+    const mergedState = {
                              habits: {
                                  user1: (remotePairData?.user1?.habits || []).map(processHabit).filter(h=>h), // Habits under user role
                                  user2: (remotePairData?.user2?.habits || []).map(processHabit).filter(h=>h)  // Habits under user role
@@ -1168,7 +1171,20 @@
              getEl('dashboard-view').classList.toggle('hidden', state.currentView !== 'compare');
 
              if (state.currentView === 'user') {
-                 renderHabits();
+                 if (state.currentUser === 'user2' && window.user2Active === false) {
+                     const container = getEl('habits-container');
+                     if (container) {
+                         container.innerHTML = `<div class="text-center text-gray-500 dark:text-gray-400 p-6">
+                             <p class="mb-2">User 2 has not accepted the invite yet.</p>
+                             <p>Please share this invitation code:</p>
+                             <p class="mt-2 font-mono text-lg text-indigo-600 dark:text-indigo-400">${localStorage.getItem('pairCode') || 'N/A'}</p>
+                         </div>`;
+                     }
+                     getEl('no-habits-message')?.classList.add('hidden');
+                     getEl('no-filtered-habits-message')?.classList.add('hidden');
+                 } else {
+                     renderHabits();
+                 }
              } else if (state.currentView === 'compare') {
                  renderDashboard();
              }
@@ -1680,7 +1696,26 @@
             [getEl('current-pin'), getEl('new-pin'), getEl('confirm-new-pin')].forEach(input => { input?.addEventListener('input', () => { if (input.value.length > 4) input.value = input.value.slice(0, 4); }); input?.addEventListener('keypress', (e) => { if (!/\d/.test(e.key) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) e.preventDefault(); }); }); // Added safe navigation
 
             setupModalAndSettingsClosers(); // Generic closers
-             console.log("setupEventListeners: All listeners attached."); // DEBUG LOG
+             // Invite Copy button
+            const copyInviteBtn = getEl('copy-invite-code-btn');
+            if (copyInviteBtn) {
+                copyInviteBtn.addEventListener('click', () => {
+                    const inviteInput = getEl('invite-code-display');
+                    if (inviteInput) {
+                        inviteInput.select();
+                        inviteInput.setSelectionRange(0, 99999);
+                        try {
+                            document.execCommand('copy');
+                            showNotification('Invite code copied!', 'success', 1500);
+                        } catch (err) {
+                            console.error('Copy failed', err);
+                            showNotification('Failed to copy invite code.', 'error', 1500);
+                        }
+                    }
+                });
+            }
+
+            console.log("setupEventListeners: All listeners attached."); // DEBUG LOG
         }
 
         function setupModalAndSettingsClosers() {
